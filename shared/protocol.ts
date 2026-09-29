@@ -28,7 +28,8 @@ export type ClientMsg =
 	| { t: "chat"; text: string }
 	| { t: "emote"; e: string };
 
-export type RemoveReason = "eaten" | "burned";
+// evicted：自訂食材滿了被移除，用它的烤架食材跟著拿掉
+export type RemoveReason = "eaten" | "burned" | "evicted";
 
 export type ServerMsg =
 	| {
@@ -52,6 +53,7 @@ export type ServerMsg =
 	| { t: "chat"; line: ChatLine }
 	| { t: "emote"; pid: string; e: string }
 	| { t: "customFood"; food: CustomFood }
+	| { t: "customFoodRemoved"; id: string }
 	| { t: "error"; code: string; message: string };
 
 export interface RoomPreview {

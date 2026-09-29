@@ -70,10 +70,6 @@ async function uploadFood(request: Request, env: Env, code: string) {
 	const key = `rooms/${code}/foods/${id}.${info.ext}`;
 	await env.IMAGES.put(key, bytes, { httpMetadata: { contentType: info.contentType } });
 	const food = await stub.addCustomFood(auth.pid, id, name, info.ext);
-	if (!food) {
-		await env.IMAGES.delete(key);
-		return reject(409, "too_many_custom_foods");
-	}
 	track(env.ANALYTICS, "upload_ok", { room: code, detail: info.ext, v1: bytes.length });
 	return json(food, 201);
 }

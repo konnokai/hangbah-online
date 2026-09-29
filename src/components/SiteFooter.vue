@@ -29,6 +29,8 @@ function onBackdrop(e: MouseEvent) {
     <RouterLink to="/">首頁</RouterLink>
     <span aria-hidden="true">·</span>
     <button type="button" class="link" aria-haspopup="dialog" @click="open">關於 / 版權標示</button>
+    <span aria-hidden="true">·</span>
+    <a href="https://github.com/konnokai/hangbah-online/issues" target="_blank" rel="noopener noreferrer">問題回報</a>
   </footer>
 
   <dialog ref="dialog" class="about-dialog" aria-labelledby="about-dialog-title" @click="onBackdrop">

@@ -150,6 +150,9 @@ export function useRoom(code: string, name: string) {
       case 'customFood':
         if (!state.customFoods.some((f) => f.id === msg.food.id)) state.customFoods.push(msg.food)
         break
+      case 'customFoodRemoved':
+        state.customFoods = state.customFoods.filter((f) => f.id !== msg.id)
+        break
       case 'error':
         if (msg.code === 'room_full') state.status = 'full'
         emit({ type: 'error', code: msg.code, message: msg.message })

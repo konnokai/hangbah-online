@@ -17,7 +17,6 @@ const ERRORS: Record<string, string> = {
   image_too_big: `圖片超過 ${LIMITS.uploadMaxDim}×${LIMITS.uploadMaxDim}`,
   unsupported_image: '只支援 PNG、JPEG、WebP',
   not_in_room: '連線斷掉了，重新整理再試一次',
-  too_many_custom_foods: `這個房間已經有 ${LIMITS.maxCustomFoods} 種自訂食材了`,
   upload_rate_limited: '上傳太快了，等一分鐘再試',
 }
 

@@ -55,7 +55,8 @@ client 端（`Grill.vue`）算到燒毀門檻就先播動畫，並把 id 放進 
 - 規格限制：根是 Container（type 17）、只能用 type 1/2/9/10/11/12/14/17、按鈕只能 style 5、JSON ≤ 3000 bytes、元件 ≤ 40。超過時 `buildPreview` 會依序砍內容。
 - 刻意不放使用者上傳的圖（不把上傳內容帶到站外）。
 
-**自訂食材上傳**：client 在 `src/utils/resizeImage.ts` 縮圖轉 WebP → `POST /api/rooms/:code/foods`，header 帶 `X-Upload-Token`（連線時 DO 發的）→ DO RPC `authorizeUpload` 檢查 token、頻率、數量 → `server/upload.ts` 用 magic bytes 和圖片 header 判斷格式與寬高（只收 PNG/JPEG/WebP，不收 SVG）→ 存 R2 → `addCustomFood` 廣播。
+**自訂食材上傳**：client 在 `src/utils/resizeImage.ts` 縮圖轉 WebP → `POST /api/rooms/:code/foods`，header 帶 `X-Upload-Token`（連線時 DO 發的）→ DO RPC `authorizeUpload` 檢查 token、頻率 → `server/upload.ts` 用 magic bytes 和圖片 header 判斷格式與寬高（只收 PNG/JPEG/WebP，不收 SVG）→ 存 R2 → `addCustomFood` 廣播。
+滿 `maxCustomFoods` 時 `addCustomFood` 會移除最舊的一種（優先挑烤架上沒在用的），連同它的烤架食材（`remove` reason `evicted`）和 R2 圖片，再廣播 `customFoodRemoved`。
 所有上限在 `shared/limits.ts`，前後端共用。
 
 **使用統計**（`server/analytics.ts`）：寫到 Workers Analytics Engine（綁定 `ANALYTICS`），站長用 Grafana 看。

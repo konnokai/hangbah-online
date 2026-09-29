@@ -290,6 +290,11 @@ onMounted(() => {
       const d: [number, number] = food ? donenessAt(ev.item, food, now(), state.heatScale) : [0, 0]
       flags.delete(ev.item.id)
       const alreadyBurnt = gone.delete(ev.item.id)
+      if (ev.reason === 'evicted') {
+        // 食材種類被移除，不是被吃掉，不播音效也不顯示分數
+        delete localDrag[ev.item.id]
+        return
+      }
       if (ev.reason === 'burned') {
         if (alreadyBurnt) return
         if (!dying[ev.item.id]) sfx.play('burn', 0.8)

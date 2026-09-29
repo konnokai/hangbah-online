@@ -72,8 +72,26 @@ const openSource = [
       <ul>
         <li>只能上傳你自己有權使用的圖片，不要上傳色情、暴力或侵權的內容。</li>
         <li>支援 PNG、JPEG、WebP。圖片會先在你的瀏覽器縮到 {{ LIMITS.clientResizeDim }}px 再上傳，上限 {{ LIMITS.uploadMaxBytes / 1024 }} KB、{{ LIMITS.uploadMaxDim }}×{{ LIMITS.uploadMaxDim }}。</li>
+        <li>每個房間最多 {{ LIMITS.maxCustomFoods }} 種自訂食材。滿了再上傳，會自動移除最舊的一種（優先移除烤架上沒在烤的）。</li>
         <li>上傳的圖片只在那個房間使用。房間 24 小時沒人就會收攤，圖片會一起刪除。</li>
         <li>分享房間連結時，預覽卡片不會顯示上傳的圖片。</li>
+      </ul>
+    </section>
+
+    <section class="card">
+      <h2>問題回報與贊助</h2>
+      <ul>
+        <li>
+          遇到 bug 或有建議，歡迎到
+          <a href="https://github.com/konnokai/hangbah-online/issues" target="_blank" rel="noopener noreferrer">GitHub Issues</a>
+          回報。
+        </li>
+        <li>
+          玩得開心的話，可以請開發者喝杯飲料：<a href="https://p.ecpay.com.tw/B8CCC" target="_blank" rel="noopener noreferrer"
+            >綠界</a
+          ><span class="muted">／</span
+          ><a href="https://paypal.me/jun112561" target="_blank" rel="noopener noreferrer">PayPal</a>
+        </li>
       </ul>
     </section>
 

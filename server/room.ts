@@ -6,6 +6,7 @@ import {
 	burnAt,
 	cleanNickname,
 	cleanText,
+	customFoodId,
 	donenessAt,
 	isPerfect,
 	onGrill,
@@ -150,8 +151,6 @@ export class BbqRoom extends DurableObject<Env> {
 		if (!this.exists) return { ok: false, status: 404, error: "room_not_found" };
 		const att = this.attachments().find((a) => a.token === token);
 		if (!token || !att) return { ok: false, status: 403, error: "not_in_room" };
-		const count = this.sql.exec<{ n: number }>("SELECT COUNT(*) AS n FROM custom_foods").one().n;
-		if (count >= LIMITS.maxCustomFoods) return { ok: false, status: 409, error: "too_many_custom_foods" };
 		const since = Date.now() - 60_000;
 		this.sql.exec("DELETE FROM uploads WHERE ts < ?", since);
 		const recent = this.sql.exec<{ n: number }>("SELECT COUNT(*) AS n FROM uploads WHERE pid = ?", att.pid).one().n;
@@ -160,16 +159,48 @@ export class BbqRoom extends DurableObject<Env> {
 		return { ok: true, pid: att.pid };
 	}
 
-	async addCustomFood(pid: string, id: string, rawName: string, ext: CustomFood["ext"]): Promise<CustomFood | null> {
-		const count = this.sql.exec<{ n: number }>("SELECT COUNT(*) AS n FROM custom_foods").one().n;
-		if (count >= LIMITS.maxCustomFoods) return null;
+	/** 滿了就移除最舊的一種，優先挑烤架上沒人在用的。 */
+	async addCustomFood(pid: string, id: string, rawName: string, ext: CustomFood["ext"]): Promise<CustomFood> {
 		const name = cleanText(rawName, LIMITS.foodNameMax) || "神秘食材";
+		// SQL 全部在第一個 await 之前做完，兩個人同時上傳時數量才不會超過上限
+		const count = this.sql.exec<{ n: number }>("SELECT COUNT(*) AS n FROM custom_foods").one().n;
+		const evicted =
+			count >= LIMITS.maxCustomFoods
+				? this.sql
+						.exec<{ id: string; ext: string }>(
+							`SELECT id, ext FROM custom_foods
+							 ORDER BY EXISTS (SELECT 1 FROM items WHERE items.food_id = 'c:' || custom_foods.id), created_at, rowid
+							 LIMIT ?`,
+							count - LIMITS.maxCustomFoods + 1,
+						)
+						.toArray()
+				: [];
+		const removedItems: string[] = [];
+		for (const f of evicted) {
+			const foodId = customFoodId(f.id);
+			// 食材定義不在了，留著的烤架食材會找不到定義，也不會燒毀
+			for (const r of this.sql.exec<{ id: string }>("SELECT id FROM items WHERE food_id = ?", foodId)) removedItems.push(r.id);
+			this.sql.exec("DELETE FROM items WHERE food_id = ?", foodId);
+			this.sql.exec("DELETE FROM custom_foods WHERE id = ?", f.id);
+		}
 		this.sql.exec(
 			"INSERT INTO custom_foods (id, name, ext, uploaded_by, created_at) VALUES (?, ?, ?, ?, ?)",
 			id, name, ext, pid, Date.now(),
 		);
 		const food: CustomFood = { id, name, ext, uploadedBy: pid };
+		for (const itemId of removedItems) this.broadcast({ t: "remove", id: itemId, reason: "evicted" });
+		for (const f of evicted) this.broadcast({ t: "customFoodRemoved", id: f.id });
 		this.broadcast({ t: "customFood", food });
+		if (removedItems.length) await this.scheduleAlarm();
+
+		const code = this.meta("code");
+		if (code && evicted.length) {
+			try {
+				await this.env.IMAGES.delete(evicted.map((f) => `rooms/${code}/foods/${f.id}.${f.ext}`));
+			} catch {
+				// 刪不掉也沒關係，房間閒置清理時會用前綴整批刪
+			}
+		}
 		return food;
 	}
 

@@ -2,7 +2,6 @@
 import { computed } from 'vue'
 import { Plus } from '@lucide/vue'
 import { BUILTIN_FOODS, customFoodId, customFoodUrl, type CustomFood } from '@shared/game'
-import { LIMITS } from '@shared/limits'
 import { FOOD_ART } from '@/foods'
 import type { Tool } from './Grill.vue'
 
@@ -13,7 +12,6 @@ const emit = defineEmits<{ press: [foodId: string, e: PointerEvent]; upload: [] 
 const customs = computed(() =>
   props.customFoods.map((c) => ({ id: customFoodId(c.id), name: c.name, url: customFoodUrl(props.code, c) })),
 )
-const full = computed(() => props.customFoods.length >= LIMITS.maxCustomFoods)
 </script>
 
 <template>
@@ -67,7 +65,7 @@ const full = computed(() => props.customFoods.length >= LIMITS.maxCustomFoods)
         <span class="art"><img :src="c.url" alt="" draggable="false" /></span>
         <span class="name">{{ c.name }}</span>
       </button>
-      <button class="food-btn add" :disabled="full" :title="full ? '自訂食材已達上限' : '上傳圖片做成食材'" @click="emit('upload')">
+      <button class="food-btn add" title="上傳圖片做成食材" @click="emit('upload')">
         <span class="art plus"><Plus :size="26" /></span>
         <span class="name">自訂食材</span>
       </button>
@@ -138,14 +136,9 @@ h2 {
     background 0.15s;
 }
 
-.food-btn:hover:not(:disabled) {
+.food-btn:hover {
   border-color: var(--accent);
   background: var(--surface-3);
-}
-
-.food-btn:disabled {
-  opacity: 0.45;
-  cursor: not-allowed;
 }
 
 .art {
