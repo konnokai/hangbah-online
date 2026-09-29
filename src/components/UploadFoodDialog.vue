@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { onBeforeUnmount, ref } from 'vue'
+import { FOOD_DIFFICULTIES, PERFECT_MIN, type FoodDifficulty } from '@shared/game'
 import { LIMITS } from '@shared/limits'
 import { resizeImage } from '@/utils/resizeImage'
 
@@ -7,6 +8,11 @@ const props = defineProps<{ code: string; token: string }>()
 const emit = defineEmits<{ close: [] }>()
 
 const name = ref('')
+const difficulty = ref<FoodDifficulty>('normal')
+const difficulties = (Object.keys(FOOD_DIFFICULTIES) as FoodDifficulty[]).map((id) => {
+  const d = FOOD_DIFFICULTIES[id]
+  return { id, label: d.label, hint: `${Math.round(d.cookTime * PERFECT_MIN)}–${d.cookTime} 秒・×${d.points}` }
+})
 const blob = ref<Blob | null>(null)
 const preview = ref('')
 const error = ref('')
@@ -47,6 +53,7 @@ async function submit() {
         'Content-Type': blob.value.type,
         'X-Upload-Token': props.token,
         'X-Food-Name': encodeURIComponent(name.value.trim()),
+        'X-Food-Difficulty': difficulty.value,
       },
       body: blob.value,
     })
@@ -83,6 +90,25 @@ onBeforeUnmount(() => preview.value && URL.revokeObjectURL(preview.value))
         <span>名稱</span>
         <input v-model="name" class="input" :maxlength="LIMITS.foodNameMax" placeholder="例如：烤蝦" required />
       </label>
+      <div class="field">
+        <span id="difficulty-label">難度</span>
+        <div class="levels" role="radiogroup" aria-labelledby="difficulty-label">
+          <button
+            v-for="d in difficulties"
+            :key="d.id"
+            type="button"
+            class="level"
+            :class="{ active: difficulty === d.id }"
+            role="radio"
+            :aria-checked="difficulty === d.id"
+            @click="difficulty = d.id"
+          >
+            <strong>{{ d.label }}</strong>
+            <small>{{ d.hint }}</small>
+          </button>
+        </div>
+        <small class="note">烤架中間烤到剛好的秒數，越難烤分數越高。</small>
+      </div>
       <p v-if="error" class="error" role="alert">{{ error }}</p>
       <div class="actions">
         <button type="button" class="btn" @click="emit('close')">取消</button>
@@ -166,6 +192,57 @@ h2 {
   gap: 4px;
   font-size: 0.9rem;
   color: var(--muted);
+}
+
+.field + .field {
+  margin-top: 12px;
+}
+
+.levels {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 6px;
+}
+
+.level {
+  display: grid;
+  justify-items: center;
+  gap: 2px;
+  padding: 7px 4px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface-2);
+  transition: border-color 0.15s, background 0.15s;
+}
+
+.level:hover {
+  background: var(--surface-3);
+}
+
+.level strong {
+  color: var(--text);
+  font-size: 0.95rem;
+}
+
+.level small {
+  color: var(--muted);
+  font-size: 0.75rem;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.level.active {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
+
+.level.active strong {
+  color: var(--gold);
+}
+
+.note {
+  color: var(--faint);
+  font-size: 0.78rem;
 }
 
 .error {

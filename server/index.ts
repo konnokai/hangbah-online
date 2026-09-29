@@ -1,4 +1,4 @@
-import { cleanNickname, cleanText } from "../shared/game";
+import { cleanNickname, cleanText, parseDifficulty } from "../shared/game";
 import { LIMITS, ROOM_CODE_ALPHABET, ROOM_CODE_RE } from "../shared/limits";
 import { track } from "./analytics";
 import { buildPreview, rewriteRoomHtml } from "./preview";
@@ -69,7 +69,8 @@ async function uploadFood(request: Request, env: Env, code: string) {
 	const id = crypto.randomUUID();
 	const key = `rooms/${code}/foods/${id}.${info.ext}`;
 	await env.IMAGES.put(key, bytes, { httpMetadata: { contentType: info.contentType } });
-	const food = await stub.addCustomFood(auth.pid, id, name, info.ext);
+	const difficulty = parseDifficulty(request.headers.get("X-Food-Difficulty"));
+	const food = await stub.addCustomFood(auth.pid, id, name, info.ext, difficulty);
 	track(env.ANALYTICS, "upload_ok", { room: code, detail: info.ext, v1: bytes.length });
 	return json(food, 201);
 }

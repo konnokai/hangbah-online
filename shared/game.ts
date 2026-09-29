@@ -22,13 +22,29 @@ export const BUILTIN_FOODS: readonly FoodDef[] = [
 	{ id: "toast", name: "吐司", cookTime: 20, points: 0.8, width: 0.085 },
 ];
 
-export const CUSTOM_FOOD_DEFAULTS = { cookTime: 40, points: 1, width: 0.09 };
+/**
+ * 自訂食材的難度，上傳時三選一。時間和倍率綁在一起，不讓玩家自己填數字，免得有人刷分。
+ * 「普通」等於加難度之前的固定值，舊的自訂食材會自動變成普通，行為不變。
+ */
+export const FOOD_DIFFICULTIES = {
+	easy: { label: "好烤", cookTime: 25, points: 0.8 },
+	normal: { label: "普通", cookTime: 40, points: 1 },
+	hard: { label: "難烤", cookTime: 60, points: 1.5 },
+} as const;
+
+export type FoodDifficulty = keyof typeof FOOD_DIFFICULTIES;
+
+/** 不認得的值一律當普通。client 送來的、資料庫讀出來的都要經過這裡。 */
+export const parseDifficulty = (v: unknown): FoodDifficulty => (v === "easy" || v === "hard" ? v : "normal");
+
+const CUSTOM_FOOD_WIDTH = 0.09;
 
 export interface CustomFood {
 	id: string;
 	name: string;
 	ext: "png" | "jpg" | "webp";
 	uploadedBy: string;
+	difficulty: FoodDifficulty;
 }
 
 export const customFoodId = (id: string) => `c:${id}`;
@@ -41,7 +57,9 @@ export function customFoodUrl(code: string, food: Pick<CustomFood, "id" | "ext">
 export function resolveFood(foodId: string, customs: readonly CustomFood[]): FoodDef | null {
 	if (foodId.startsWith("c:")) {
 		const custom = customs.find((c) => customFoodId(c.id) === foodId);
-		return custom ? { id: foodId, name: custom.name, ...CUSTOM_FOOD_DEFAULTS } : null;
+		if (!custom) return null;
+		const { cookTime, points } = FOOD_DIFFICULTIES[parseDifficulty(custom.difficulty)];
+		return { id: foodId, name: custom.name, cookTime, points, width: CUSTOM_FOOD_WIDTH };
 	}
 	return BUILTIN_FOODS.find((f) => f.id === foodId) ?? null;
 }

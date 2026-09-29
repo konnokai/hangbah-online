@@ -10,11 +10,13 @@ import {
 	donenessAt,
 	isPerfect,
 	onGrill,
+	parseDifficulty,
 	resolveFood,
 	scoreOf,
 	settle,
 	type CustomFood,
 	type FoodDef,
+	type FoodDifficulty,
 	type GrillItem,
 } from "../shared/game";
 import { LIMITS, PLAYER_ID_RE } from "../shared/limits";
@@ -83,7 +85,8 @@ export class BbqRoom extends DurableObject<Env> {
 			);
 			CREATE TABLE IF NOT EXISTS custom_foods (
 				id TEXT PRIMARY KEY, name TEXT NOT NULL, ext TEXT NOT NULL,
-				uploaded_by TEXT NOT NULL, created_at INTEGER NOT NULL
+				uploaded_by TEXT NOT NULL, created_at INTEGER NOT NULL,
+				difficulty TEXT NOT NULL DEFAULT 'normal'
 			);
 			CREATE TABLE IF NOT EXISTS uploads (pid TEXT NOT NULL, ts INTEGER NOT NULL);
 			CREATE TABLE IF NOT EXISTS chat (
@@ -91,6 +94,12 @@ export class BbqRoom extends DurableObject<Env> {
 				color TEXT NOT NULL, text TEXT NOT NULL, ts INTEGER NOT NULL
 			);
 		`);
+		// 加難度之前建的房間沒有這欄。DO 文件沒寫支援哪些 PRAGMA，所以不查欄位，直接加、已經有就忽略
+		try {
+			this.sql.exec("ALTER TABLE custom_foods ADD COLUMN difficulty TEXT NOT NULL DEFAULT 'normal'");
+		} catch (e) {
+			if (!/duplicate column/i.test(String(e))) throw e;
+		}
 	}
 
 	private get heatScale() {
@@ -160,8 +169,15 @@ export class BbqRoom extends DurableObject<Env> {
 	}
 
 	/** 滿了就移除最舊的一種，優先挑烤架上沒人在用的。 */
-	async addCustomFood(pid: string, id: string, rawName: string, ext: CustomFood["ext"]): Promise<CustomFood> {
+	async addCustomFood(
+		pid: string,
+		id: string,
+		rawName: string,
+		ext: CustomFood["ext"],
+		rawDifficulty?: FoodDifficulty,
+	): Promise<CustomFood> {
 		const name = cleanText(rawName, LIMITS.foodNameMax) || "神秘食材";
+		const difficulty = parseDifficulty(rawDifficulty);
 		// SQL 全部在第一個 await 之前做完，兩個人同時上傳時數量才不會超過上限
 		const count = this.sql.exec<{ n: number }>("SELECT COUNT(*) AS n FROM custom_foods").one().n;
 		const evicted =
@@ -184,10 +200,10 @@ export class BbqRoom extends DurableObject<Env> {
 			this.sql.exec("DELETE FROM custom_foods WHERE id = ?", f.id);
 		}
 		this.sql.exec(
-			"INSERT INTO custom_foods (id, name, ext, uploaded_by, created_at) VALUES (?, ?, ?, ?, ?)",
-			id, name, ext, pid, Date.now(),
+			"INSERT INTO custom_foods (id, name, ext, uploaded_by, created_at, difficulty) VALUES (?, ?, ?, ?, ?, ?)",
+			id, name, ext, pid, Date.now(), difficulty,
 		);
-		const food: CustomFood = { id, name, ext, uploadedBy: pid };
+		const food: CustomFood = { id, name, ext, uploadedBy: pid, difficulty };
 		for (const itemId of removedItems) this.broadcast({ t: "remove", id: itemId, reason: "evicted" });
 		for (const f of evicted) this.broadcast({ t: "customFoodRemoved", id: f.id });
 		this.broadcast({ t: "customFood", food });
@@ -514,11 +530,17 @@ export class BbqRoom extends DurableObject<Env> {
 
 	private customFoods(): CustomFood[] {
 		return this.sql
-			.exec<{ id: string; name: string; ext: string; uploaded_by: string }>(
-				"SELECT id, name, ext, uploaded_by FROM custom_foods ORDER BY created_at",
+			.exec<{ id: string; name: string; ext: string; uploaded_by: string; difficulty: string }>(
+				"SELECT id, name, ext, uploaded_by, difficulty FROM custom_foods ORDER BY created_at",
 			)
 			.toArray()
-			.map((r) => ({ id: r.id, name: r.name, ext: r.ext as CustomFood["ext"], uploadedBy: r.uploaded_by }));
+			.map((r) => ({
+				id: r.id,
+				name: r.name,
+				ext: r.ext as CustomFood["ext"],
+				uploadedBy: r.uploaded_by,
+				difficulty: parseDifficulty(r.difficulty),
+			}));
 	}
 
 	private loadItems(): GrillItem[] {

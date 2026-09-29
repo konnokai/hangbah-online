@@ -184,6 +184,64 @@ describe("上傳自訂食材", () => {
 		});
 	});
 
+	describe("難度", () => {
+		const uploadWith = (code: string, token: string, difficulty?: string) =>
+			call(`/api/rooms/${code}/foods`, {
+				method: "POST",
+				headers: {
+					"X-Upload-Token": token,
+					"X-Food-Name": encodeURIComponent("蝦子"),
+					"Content-Type": "image/webp",
+					...(difficulty === undefined ? {} : { "X-Food-Difficulty": difficulty }),
+				},
+				body: png(10, 10),
+			});
+
+		it("上傳時選的難度會存起來、廣播出去，重新連線也讀得到", async () => {
+			const code = await createRoom();
+			const { c, token } = await joinWithToken(code);
+			const res = await uploadWith(code, token, "hard");
+			expect(res.status).toBe(201);
+			const food = (await res.json()) as CustomFood;
+			expect(food.difficulty).toBe("hard");
+			expect((await c.next("customFood")).food.difficulty).toBe("hard");
+
+			const again = await Client.connect(code, "小美");
+			const w = await again.next("welcome");
+			expect(w.customFoods.find((f) => f.id === food.id)?.difficulty).toBe("hard");
+			c.close();
+			again.close();
+		});
+
+		it("沒帶或亂填就當普通", async () => {
+			const code = await createRoom();
+			const { c, token } = await joinWithToken(code);
+			expect(((await (await uploadWith(code, token)).json()) as CustomFood).difficulty).toBe("normal");
+			expect(((await (await uploadWith(code, token, "extreme")).json()) as CustomFood).difficulty).toBe("normal");
+			c.close();
+		});
+
+		it("加難度之前建的房間會補上欄位，舊食材變成普通，重跑也不會出錯", async () => {
+			const code = await createRoom();
+			const id = crypto.randomUUID();
+			await runInDurableObject(env.ROOMS.getByName(code), (o, state) => {
+				// 還原成沒有難度欄位的舊資料表，塞一筆舊食材
+				state.storage.sql.exec("ALTER TABLE custom_foods DROP COLUMN difficulty");
+				state.storage.sql.exec(
+					"INSERT INTO custom_foods (id, name, ext, uploaded_by, created_at) VALUES (?, '舊食材', 'png', 'someone', 1)",
+					id,
+				);
+				const migrate = () => (o as unknown as { migrate(): void }).migrate();
+				migrate();
+				migrate();
+			});
+			const c = await Client.connect(code, "阿明");
+			const w = await c.next("welcome");
+			expect(w.customFoods.find((f) => f.id === id)?.difficulty).toBe("normal");
+			c.close();
+		});
+	});
+
 	it("圖片網址格式不對就 404", async () => {
 		const code = await createRoom();
 		expect((await call(`/api/img/${code}/../../secret.png`)).status).toBe(404);

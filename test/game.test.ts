@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
 	BUILTIN_FOODS,
 	BURN,
+	FOOD_DIFFICULTIES,
 	GRILL,
 	burnAt,
 	cleanText,
@@ -9,6 +10,7 @@ import {
 	heatAt,
 	isPerfect,
 	onGrill,
+	parseDifficulty,
 	resolveFood,
 	scoreOf,
 	settle,
@@ -114,10 +116,26 @@ describe("輸入清理", () => {
 	});
 
 	it("自訂食材要在房間清單裡才找得到", () => {
-		const customs = [{ id: "x1", name: "蝦子", ext: "webp" as const, uploadedBy: "p" }];
+		const customs = [{ id: "x1", name: "蝦子", ext: "webp" as const, uploadedBy: "p", difficulty: "normal" as const }];
 		expect(resolveFood("c:x1", customs)?.name).toBe("蝦子");
 		expect(resolveFood("c:nope", customs)).toBeNull();
 		expect(resolveFood("meat", [])?.name).toBe("肉片");
 		expect(resolveFood("__proto__", [])).toBeNull();
+	});
+
+	it("自訂食材的烤熟時間和分數倍率跟著難度走", () => {
+		const food = (difficulty: "easy" | "normal" | "hard") =>
+			resolveFood("c:x1", [{ id: "x1", name: "蝦子", ext: "webp", uploadedBy: "p", difficulty }]);
+		expect(food("easy")).toMatchObject({ cookTime: FOOD_DIFFICULTIES.easy.cookTime, points: FOOD_DIFFICULTIES.easy.points });
+		expect(food("hard")).toMatchObject({ cookTime: FOOD_DIFFICULTIES.hard.cookTime, points: FOOD_DIFFICULTIES.hard.points });
+		// 普通要等於加難度之前的固定值，舊食材才不會變
+		expect(food("normal")).toMatchObject({ cookTime: 40, points: 1 });
+		expect(food("easy")!.cookTime).toBeLessThan(food("hard")!.cookTime);
+	});
+
+	it("不認得的難度一律當普通", () => {
+		expect(parseDifficulty("hard")).toBe("hard");
+		expect(parseDifficulty("easy")).toBe("easy");
+		for (const v of ["", "HARD", "extreme", null, undefined, 3, "__proto__"]) expect(parseDifficulty(v)).toBe("normal");
 	});
 });

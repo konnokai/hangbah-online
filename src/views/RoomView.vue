@@ -2,7 +2,7 @@
 import { computed, effectScope, nextTick, onBeforeUnmount, onMounted, reactive, ref, shallowRef, watch } from 'vue'
 import { RouterLink, onBeforeRouteLeave, useRoute, useRouter } from 'vue-router'
 import { Link, MessageCircle } from '@lucide/vue'
-import { BUILTIN_FOODS, customFoodUrl } from '@shared/game'
+import { BUILTIN_FOODS, FOOD_DIFFICULTIES, PERFECT_MIN, customFoodUrl, resolveFood } from '@shared/game'
 import { ROOM_CODE_RE } from '@shared/limits'
 import { useRoom, type Room } from '@/composables/useRoom'
 import { useMutedPlayers } from '@/composables/useMutedPlayers'
@@ -243,6 +243,17 @@ const trayFoodName = computed(() => {
   if (!id.startsWith('c:')) return BUILTIN_FOODS.find((b) => b.id === id)?.name ?? ''
   return room.value?.state.customFoods.find((f) => `c:${f.id}` === id)?.name ?? ''
 })
+// 預覽順便告訴玩家要烤多久、分數幾倍。秒數是烤架中間（火力 1）烤到「剛好」的區間
+const trayFoodStats = computed(() => {
+  const r = room.value
+  if (!r) return ''
+  const food = resolveFood(trayDrag.foodId, r.state.customFoods)
+  if (!food) return ''
+  const s = (t: number) => Math.round(t / r.state.heatScale)
+  const custom = r.state.customFoods.find((f) => `c:${f.id}` === trayDrag.foodId)
+  const level = custom ? `${FOOD_DIFFICULTIES[custom.difficulty].label}・` : ''
+  return `${level}中間烤 ${s(food.cookTime * PERFECT_MIN)}–${s(food.cookTime)} 秒剛好・分數 ×${food.points}`
+})
 const ghostWidth = computed(() => {
   const f = BUILTIN_FOODS.find((b) => b.id === trayDrag.foodId)
   return f ? Math.round(f.width * 900) : 70
@@ -383,6 +394,7 @@ const ghostWidth = computed(() => {
           <img v-else-if="ghostImage" :src="ghostImage" alt="" />
         </div>
         <p class="peek-name">{{ trayFoodName }}</p>
+        <p v-if="trayFoodStats" class="peek-stats">{{ trayFoodStats }}</p>
       </div>
     </div>
 
@@ -723,6 +735,15 @@ code {
   font-weight: 700;
   text-align: center;
   overflow-wrap: anywhere;
+}
+
+.peek-stats {
+  max-width: min(300px, 70vw);
+  margin: -6px 0 0;
+  color: var(--muted);
+  font-size: 0.8rem;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
 }
 
 @keyframes peek-in {

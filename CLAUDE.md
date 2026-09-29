@@ -58,6 +58,8 @@ client 端（`Grill.vue`）算到燒毀門檻就先播動畫，並把 id 放進 
 **自訂食材上傳**：client 在 `src/utils/resizeImage.ts` 縮圖轉 WebP → `POST /api/rooms/:code/foods`，header 帶 `X-Upload-Token`（連線時 DO 發的）→ DO RPC `authorizeUpload` 檢查 token、頻率 → `server/upload.ts` 用 magic bytes 和圖片 header 判斷格式與寬高（只收 PNG/JPEG/WebP，不收 SVG）→ 存 R2 → `addCustomFood` 廣播。
 滿 `maxCustomFoods` 時 `addCustomFood` 會移除最舊的一種（優先挑烤架上沒在用的），連同它的烤架食材（`remove` reason `evicted`）和 R2 圖片，再廣播 `customFoodRemoved`。
 所有上限在 `shared/limits.ts`，前後端共用。
+難度三選一（header `X-Food-Difficulty`），時間和分數倍率在 `shared/game.ts` 的 `FOOD_DIFFICULTIES`，不讓玩家自己填數字。「普通」等於加難度之前的固定值。
+進來的值一律經過 `parseDifficulty()`。舊房間沒有 `difficulty` 欄位，`migrate()` 會用 `ALTER TABLE` 補上；欄位已經存在時會報「duplicate column」錯誤，用 try/catch 忽略（DO 文件沒寫支援哪些 PRAGMA，所以不查欄位）。
 
 **使用統計**（`server/analytics.ts`）：寫到 Workers Analytics Engine（綁定 `ANALYTICS`），站長用 Grafana 看。
 - 一律走 `track()`，欄位位置和事件表在 `docs/analytics.md`，Grafana dashboard 在 `docs/grafana-dashboard.json`。新增事件時兩份文件要一起更新。
