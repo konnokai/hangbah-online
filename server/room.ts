@@ -7,6 +7,7 @@ import {
 	cleanNickname,
 	cleanText,
 	donenessAt,
+	isPerfect,
 	onGrill,
 	resolveFood,
 	scoreOf,
@@ -17,6 +18,7 @@ import {
 } from "../shared/game";
 import { LIMITS, PLAYER_ID_RE } from "../shared/limits";
 import type { ChatLine, ClientMsg, PlayerInfo, RoomPreview, ServerMsg } from "../shared/protocol";
+import { foodKey, track, type AnalyticsEvent, type AnalyticsFields } from "./analytics";
 
 interface Attachment {
 	pid: string;
@@ -56,6 +58,8 @@ export class BbqRoom extends DurableObject<Env> {
 	private sql: SqlStorage;
 	// 休眠醒來會清空，限流重新計算可以接受
 	private buckets = new WeakMap<WebSocket, Map<string, Bucket>>();
+	// 同一條連線可能先後觸發 webSocketError 和 webSocketClose，離開只算一次
+	private departed = new WeakSet<WebSocket>();
 
 	constructor(ctx: DurableObjectState, env: Env) {
 		super(ctx, env);
@@ -108,6 +112,10 @@ export class BbqRoom extends DurableObject<Env> {
 		return this.meta("code") !== null;
 	}
 
+	private track(event: AnalyticsEvent, f: AnalyticsFields = {}) {
+		track(this.env.ANALYTICS, event, { room: this.meta("code") ?? "", ...f });
+	}
+
 	// ---------- RPC（Worker 呼叫） ----------
 
 	/** 建立房間。房號已被用過就回傳 false，讓呼叫端換一個。 */
@@ -118,6 +126,7 @@ export class BbqRoom extends DurableObject<Env> {
 		this.setMeta("created_at", String(Date.now()));
 		this.setMeta("last_active", String(Date.now()));
 		await this.scheduleAlarm();
+		this.track("room_created");
 		return true;
 	}
 
@@ -183,10 +192,11 @@ export class BbqRoom extends DurableObject<Env> {
 			server.accept();
 			this.send(server, { t: "error", code: "room_full", message: `這場烤肉已經 ${LIMITS.maxPlayers} 個人了` });
 			server.close(4003, "room_full");
+			this.track("room_full");
 			return new Response(null, { status: 101, webSocket: client });
 		}
 
-		const color = this.upsertPlayer(pid, name);
+		const { color, isNew } = this.upsertPlayer(pid, name);
 		const pair = new WebSocketPair();
 		const [client, server] = Object.values(pair) as [WebSocket, WebSocket];
 		const att: Attachment = { pid, name, color, token: crypto.randomUUID() };
@@ -206,7 +216,10 @@ export class BbqRoom extends DurableObject<Env> {
 			customFoods: this.customFoods(),
 			chat: this.chatHistory(),
 		});
-		if (!onlinePids.has(pid)) this.broadcast({ t: "joined", pid, name }, server);
+		if (!onlinePids.has(pid)) {
+			this.broadcast({ t: "joined", pid, name }, server);
+			this.track("player_joined", { detail: isNew ? "new" : "return", v1: onlinePids.size + 1 });
+		}
 		this.broadcast({ t: "players", players: this.players() });
 		// 有人在線時不需要閒置清理，只留燒毀用的 alarm
 		await this.scheduleAlarm();
@@ -243,7 +256,12 @@ export class BbqRoom extends DurableObject<Env> {
 	private async onDisconnect(ws: WebSocket) {
 		const att = ws.deserializeAttachment() as Attachment | null;
 		if (!att) return;
-		const stillOnline = this.sockets(ws).some((s) => (s.deserializeAttachment() as Attachment).pid === att.pid);
+		const others = this.sockets(ws).map((s) => (s.deserializeAttachment() as Attachment).pid);
+		const stillOnline = others.includes(att.pid);
+		if (!stillOnline && !this.departed.has(ws)) {
+			this.departed.add(ws);
+			this.track("player_left", { v1: new Set(others).size });
+		}
 		if (!stillOnline) {
 			// 夾著食材斷線的話放回原位，不然會永遠卡住
 			const now = Date.now();
@@ -288,11 +306,13 @@ export class BbqRoom extends DurableObject<Env> {
 					LIMITS.chatHistory,
 				);
 				this.broadcast({ t: "chat", line });
+				this.track("chat_sent", { v1: Array.from(text).length });
 				return;
 			}
 			case "emote": {
 				if (!(EMOTES as readonly string[]).includes(msg.e)) return;
 				this.broadcast({ t: "emote", pid: att.pid, e: msg.e });
+				this.track("emote_sent", { detail: msg.e });
 				return;
 			}
 			case "spawn": {
@@ -317,6 +337,7 @@ export class BbqRoom extends DurableObject<Env> {
 				};
 				this.saveItem(item, now);
 				this.broadcast({ t: "item", item, by: att.pid, action: "spawn" });
+				this.track("food_spawned", { food: foodKey(food.id), v1: item.since === null ? 0 : 1 });
 				await this.scheduleAlarm();
 				return;
 			}
@@ -335,7 +356,7 @@ export class BbqRoom extends DurableObject<Env> {
 				const d = donenessAt(item, food, now, this.heatScale);
 				// alarm 還沒跑到但其實已經燒掉了，當作燒毀處理
 				if (Math.max(d[0], d[1]) >= BURN) {
-					this.burn([item.id]);
+					this.burn([item], "lazy");
 					await this.scheduleAlarm();
 					return;
 				}
@@ -346,6 +367,12 @@ export class BbqRoom extends DurableObject<Env> {
 					this.sql.exec("UPDATE players SET score = score + ? WHERE pid = ?", score, att.pid);
 					this.broadcast({ t: "remove", id: item.id, reason: "eaten", by: att.pid, score });
 					this.broadcast({ t: "players", players: this.players() });
+					this.track("food_eaten", {
+						food: foodKey(food.id),
+						v1: score,
+						v2: isPerfect(d) ? 1 : 0,
+						v3: item.sauced ? 1 : 0,
+					});
 					await this.scheduleAlarm();
 					return;
 				}
@@ -369,6 +396,7 @@ export class BbqRoom extends DurableObject<Env> {
 				}
 				this.saveItem(item);
 				this.broadcast({ t: "item", item, by: att.pid, action: msg.t });
+				if (msg.t === "sauce") this.track("food_sauced", { food: foodKey(food.id) });
 				await this.scheduleAlarm();
 				return;
 			}
@@ -379,14 +407,14 @@ export class BbqRoom extends DurableObject<Env> {
 
 	async alarm() {
 		const now = Date.now();
-		const due: string[] = [];
+		const due: GrillItem[] = [];
 		for (const item of this.loadItems()) {
 			const food = this.food(item.foodId);
 			const at = food ? burnAt(item, food, this.heatScale) : null;
 			// 留一點誤差，避免 alarm 提早幾毫秒醒來又要再排一次
-			if (at !== null && at <= now + 50) due.push(item.id);
+			if (at !== null && at <= now + 50) due.push(item);
 		}
-		if (due.length) this.burn(due);
+		if (due.length) this.burn(due, "alarm");
 
 		if (this.sockets().length === 0) {
 			const lastActive = Number(this.meta("last_active") ?? 0);
@@ -398,10 +426,12 @@ export class BbqRoom extends DurableObject<Env> {
 		await this.scheduleAlarm();
 	}
 
-	private burn(ids: string[]) {
-		for (const id of ids) {
-			this.sql.exec("DELETE FROM items WHERE id = ?", id);
-			this.broadcast({ t: "remove", id, reason: "burned" });
+	/** lazy：有人動到才發現已經燒掉；alarm：到時間自己燒掉。 */
+	private burn(items: GrillItem[], via: "lazy" | "alarm") {
+		for (const item of items) {
+			this.sql.exec("DELETE FROM items WHERE id = ?", item.id);
+			this.broadcast({ t: "remove", id: item.id, reason: "burned" });
+			this.track("food_burned", { food: foodKey(item.foodId), detail: via });
 		}
 	}
 
@@ -425,6 +455,13 @@ export class BbqRoom extends DurableObject<Env> {
 	private async wipe() {
 		const code = this.meta("code");
 		if (code) {
+			// 資料要刪了，先記下這個房間的一生
+			const count = (table: string) => this.sql.exec<{ n: number }>(`SELECT COUNT(*) AS n FROM ${table}`).one().n;
+			this.track("room_wiped", {
+				v1: Date.now() - Number(this.meta("created_at") ?? Date.now()),
+				v2: count("players"),
+				v3: count("custom_foods"),
+			});
 			let cursor: string | undefined;
 			do {
 				const page = await this.env.IMAGES.list({ prefix: `rooms/${code}/`, cursor });
@@ -474,11 +511,11 @@ export class BbqRoom extends DurableObject<Env> {
 		);
 	}
 
-	private upsertPlayer(pid: string, name: string): string {
+	private upsertPlayer(pid: string, name: string): { color: string; isNew: boolean } {
 		const existing = this.sql.exec<{ color: string }>("SELECT color FROM players WHERE pid = ?", pid).toArray()[0];
 		if (existing) {
 			this.sql.exec("UPDATE players SET name = ? WHERE pid = ?", name, pid);
-			return existing.color;
+			return { color: existing.color, isNew: false };
 		}
 		const n = this.sql.exec<{ n: number }>("SELECT COUNT(*) AS n FROM players").one().n;
 		const color = PLAYER_COLORS[n % PLAYER_COLORS.length]!;
@@ -486,7 +523,7 @@ export class BbqRoom extends DurableObject<Env> {
 			"INSERT INTO players (pid, name, color, score, joined_at) VALUES (?, ?, ?, 0, ?)",
 			pid, name, color, Date.now(),
 		);
-		return color;
+		return { color, isNew: true };
 	}
 
 	private players(closing?: WebSocket): PlayerInfo[] {

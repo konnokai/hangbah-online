@@ -1,0 +1,1487 @@
+{
+  "__inputs": [
+    {
+      "name": "DS_HANGBAH",
+      "label": "Workers Analytics Engine",
+      "description": "指向 Workers Analytics Engine SQL API 的 Altinity ClickHouse datasource",
+      "type": "datasource",
+      "pluginId": "vertamedia-clickhouse-datasource",
+      "pluginName": "Altinity plugin for ClickHouse"
+    }
+  ],
+  "__requires": [
+    {
+      "type": "datasource",
+      "id": "vertamedia-clickhouse-datasource",
+      "name": "Altinity plugin for ClickHouse",
+      "version": ""
+    },
+    {
+      "type": "panel",
+      "id": "stat",
+      "name": "Stat",
+      "version": ""
+    },
+    {
+      "type": "panel",
+      "id": "timeseries",
+      "name": "Time series",
+      "version": ""
+    },
+    {
+      "type": "panel",
+      "id": "barchart",
+      "name": "Bar chart",
+      "version": ""
+    },
+    {
+      "type": "panel",
+      "id": "table",
+      "name": "Table",
+      "version": ""
+    }
+  ],
+  "title": "夯肉 使用統計",
+  "uid": "hangbah-analytics",
+  "description": "資料來源：Workers Analytics Engine dataset hangbah_events。欄位說明見 repo 的 docs/analytics.md。",
+  "tags": [
+    "hangbah",
+    "cloudflare"
+  ],
+  "timezone": "browser",
+  "editable": true,
+  "graphTooltip": 1,
+  "refresh": "",
+  "schemaVersion": 39,
+  "time": {
+    "from": "now-7d",
+    "to": "now"
+  },
+  "templating": {
+    "list": []
+  },
+  "annotations": {
+    "list": []
+  },
+  "links": [],
+  "panels": [
+    {
+      "id": 1,
+      "type": "row",
+      "title": "房間與玩家",
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 0
+      },
+      "panels": []
+    },
+    {
+      "type": "stat",
+      "title": "開房數",
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "vertamedia-clickhouse-datasource",
+            "uid": "${DS_HANGBAH}"
+          },
+          "format": "table",
+          "editorMode": "sql",
+          "dateTimeType": "DATETIME",
+          "dateTimeColDataType": "timestamp",
+          "dateColDataType": "",
+          "extrapolate": false,
+          "skip_comments": true,
+          "add_metadata": false,
+          "round": "0s",
+          "intervalFactor": 1,
+          "interval": "",
+          "query": "SELECT SUM(_sample_interval) AS n FROM hangbah_events WHERE $timeFilter AND blob1 = 'room_created'"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "color": {
+            "mode": "fixed",
+            "fixedColor": "orange"
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "value",
+        "graphMode": "none",
+        "textMode": "auto",
+        "justifyMode": "auto",
+        "orientation": "auto"
+      },
+      "id": 2,
+      "datasource": {
+        "type": "vertamedia-clickhouse-datasource",
+        "uid": "${DS_HANGBAH}"
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 6,
+        "x": 0,
+        "y": 1
+      }
+    },
+    {
+      "type": "stat",
+      "title": "進房人次",
+      "description": "同一個玩家多開分頁不算。重新連線會再算一次（回訪）。",
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "vertamedia-clickhouse-datasource",
+            "uid": "${DS_HANGBAH}"
+          },
+          "format": "table",
+          "editorMode": "sql",
+          "dateTimeType": "DATETIME",
+          "dateTimeColDataType": "timestamp",
+          "dateColDataType": "",
+          "extrapolate": false,
+          "skip_comments": true,
+          "add_metadata": false,
+          "round": "0s",
+          "intervalFactor": 1,
+          "interval": "",
+          "query": "SELECT SUM(_sample_interval) AS n FROM hangbah_events WHERE $timeFilter AND blob1 = 'player_joined'"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "color": {
+            "mode": "fixed",
+            "fixedColor": "orange"
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "value",
+        "graphMode": "none",
+        "textMode": "auto",
+        "justifyMode": "auto",
+        "orientation": "auto"
+      },
+      "id": 3,
+      "datasource": {
+        "type": "vertamedia-clickhouse-datasource",
+        "uid": "${DS_HANGBAH}"
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 6,
+        "x": 6,
+        "y": 1
+      }
+    },
+    {
+      "type": "stat",
+      "title": "人滿被擋",
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "vertamedia-clickhouse-datasource",
+            "uid": "${DS_HANGBAH}"
+          },
+          "format": "table",
+          "editorMode": "sql",
+          "dateTimeType": "DATETIME",
+          "dateTimeColDataType": "timestamp",
+          "dateColDataType": "",
+          "extrapolate": false,
+          "skip_comments": true,
+          "add_metadata": false,
+          "round": "0s",
+          "intervalFactor": 1,
+          "interval": "",
+          "query": "SELECT SUM(_sample_interval) AS n FROM hangbah_events WHERE $timeFilter AND blob1 = 'room_full'"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "color": {
+            "mode": "fixed",
+            "fixedColor": "orange"
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "value",
+        "graphMode": "none",
+        "textMode": "auto",
+        "justifyMode": "auto",
+        "orientation": "auto"
+      },
+      "id": 4,
+      "datasource": {
+        "type": "vertamedia-clickhouse-datasource",
+        "uid": "${DS_HANGBAH}"
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 6,
+        "x": 12,
+        "y": 1
+      }
+    },
+    {
+      "type": "stat",
+      "title": "活躍房間數",
+      "description": "時間範圍內有人進過的房間數。count(DISTINCT) 不考慮抽樣，流量很大時會偏低。",
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "vertamedia-clickhouse-datasource",
+            "uid": "${DS_HANGBAH}"
+          },
+          "format": "table",
+          "editorMode": "sql",
+          "dateTimeType": "DATETIME",
+          "dateTimeColDataType": "timestamp",
+          "dateColDataType": "",
+          "extrapolate": false,
+          "skip_comments": true,
+          "add_metadata": false,
+          "round": "0s",
+          "intervalFactor": 1,
+          "interval": "",
+          "query": "SELECT count(DISTINCT blob4) AS rooms FROM hangbah_events WHERE $timeFilter AND blob1 = 'player_joined'"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "color": {
+            "mode": "fixed",
+            "fixedColor": "orange"
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "value",
+        "graphMode": "none",
+        "textMode": "auto",
+        "justifyMode": "auto",
+        "orientation": "auto"
+      },
+      "id": 5,
+      "datasource": {
+        "type": "vertamedia-clickhouse-datasource",
+        "uid": "${DS_HANGBAH}"
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 6,
+        "x": 18,
+        "y": 1
+      }
+    },
+    {
+      "type": "timeseries",
+      "title": "進房人次（新／回訪）",
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "vertamedia-clickhouse-datasource",
+            "uid": "${DS_HANGBAH}"
+          },
+          "format": "time_series",
+          "editorMode": "sql",
+          "dateTimeType": "DATETIME",
+          "dateTimeColDataType": "timestamp",
+          "dateColDataType": "",
+          "extrapolate": false,
+          "skip_comments": true,
+          "add_metadata": false,
+          "round": "0s",
+          "intervalFactor": 1,
+          "interval": "",
+          "query": "SELECT $timeSeries AS t, blob3 AS label, SUM(_sample_interval) AS n FROM hangbah_events WHERE $timeFilter AND blob1 = 'player_joined' GROUP BY label, t ORDER BY t"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "drawStyle": "bars",
+            "fillOpacity": 80,
+            "lineWidth": 1,
+            "stacking": {
+              "mode": "normal"
+            }
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "id": 6,
+      "datasource": {
+        "type": "vertamedia-clickhouse-datasource",
+        "uid": "${DS_HANGBAH}"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 5
+      }
+    },
+    {
+      "type": "timeseries",
+      "title": "開房數",
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "vertamedia-clickhouse-datasource",
+            "uid": "${DS_HANGBAH}"
+          },
+          "format": "time_series",
+          "editorMode": "sql",
+          "dateTimeType": "DATETIME",
+          "dateTimeColDataType": "timestamp",
+          "dateColDataType": "",
+          "extrapolate": false,
+          "skip_comments": true,
+          "add_metadata": false,
+          "round": "0s",
+          "intervalFactor": 1,
+          "interval": "",
+          "query": "SELECT $timeSeries AS t, SUM(_sample_interval) AS rooms FROM hangbah_events WHERE $timeFilter AND blob1 = 'room_created' GROUP BY t ORDER BY t"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "drawStyle": "bars",
+            "fillOpacity": 80,
+            "lineWidth": 1,
+            "stacking": {
+              "mode": "normal"
+            }
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "id": 7,
+      "datasource": {
+        "type": "vertamedia-clickhouse-datasource",
+        "uid": "${DS_HANGBAH}"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 5
+      }
+    },
+    {
+      "type": "timeseries",
+      "title": "每房同時在線峰值",
+      "description": "單一房間在這段時間內的最高在線人數。全站同時在線人數算不出來。",
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "vertamedia-clickhouse-datasource",
+            "uid": "${DS_HANGBAH}"
+          },
+          "format": "time_series",
+          "editorMode": "sql",
+          "dateTimeType": "DATETIME",
+          "dateTimeColDataType": "timestamp",
+          "dateColDataType": "",
+          "extrapolate": false,
+          "skip_comments": true,
+          "add_metadata": false,
+          "round": "0s",
+          "intervalFactor": 1,
+          "interval": "",
+          "query": "SELECT $timeSeries AS t, MAX(double1) AS peak FROM hangbah_events WHERE $timeFilter AND blob1 = 'player_joined' GROUP BY t ORDER BY t"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "drawStyle": "line",
+            "fillOpacity": 10,
+            "lineWidth": 1,
+            "stacking": {
+              "mode": "none"
+            }
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "id": 8,
+      "datasource": {
+        "type": "vertamedia-clickhouse-datasource",
+        "uid": "${DS_HANGBAH}"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 13
+      }
+    },
+    {
+      "type": "stat",
+      "title": "房間存活時間",
+      "description": "閒置清掉的房間，從開房到清掉的時間。包含最後 24 小時的閒置等待。wiped 是清掉的房間數。",
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "vertamedia-clickhouse-datasource",
+            "uid": "${DS_HANGBAH}"
+          },
+          "format": "table",
+          "editorMode": "sql",
+          "dateTimeType": "DATETIME",
+          "dateTimeColDataType": "timestamp",
+          "dateColDataType": "",
+          "extrapolate": false,
+          "skip_comments": true,
+          "add_metadata": false,
+          "round": "0s",
+          "intervalFactor": 1,
+          "interval": "",
+          "query": "SELECT quantileExactWeighted(0.5)(double1, _sample_interval) / 3600000 AS p50, quantileExactWeighted(0.9)(double1, _sample_interval) / 3600000 AS p90, SUM(_sample_interval) AS wiped FROM hangbah_events WHERE $timeFilter AND blob1 = 'room_wiped'"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "h",
+          "decimals": 1,
+          "color": {
+            "mode": "fixed",
+            "fixedColor": "orange"
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "wiped"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "short"
+              },
+              {
+                "id": "decimals",
+                "value": 0
+              }
+            ]
+          }
+        ]
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "value",
+        "graphMode": "none",
+        "textMode": "auto",
+        "justifyMode": "auto",
+        "orientation": "auto"
+      },
+      "id": 9,
+      "datasource": {
+        "type": "vertamedia-clickhouse-datasource",
+        "uid": "${DS_HANGBAH}"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 13
+      }
+    },
+    {
+      "id": 10,
+      "type": "row",
+      "title": "烤肉行為",
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 21
+      },
+      "panels": []
+    },
+    {
+      "type": "stat",
+      "title": "完美率",
+      "description": "吃掉的食材裡，兩面都剛好的比例。",
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "vertamedia-clickhouse-datasource",
+            "uid": "${DS_HANGBAH}"
+          },
+          "format": "table",
+          "editorMode": "sql",
+          "dateTimeType": "DATETIME",
+          "dateTimeColDataType": "timestamp",
+          "dateColDataType": "",
+          "extrapolate": false,
+          "skip_comments": true,
+          "add_metadata": false,
+          "round": "0s",
+          "intervalFactor": 1,
+          "interval": "",
+          "query": "SELECT SUM(_sample_interval * double2) / SUM(_sample_interval) AS rate FROM hangbah_events WHERE $timeFilter AND blob1 = 'food_eaten'"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit",
+          "decimals": 1,
+          "color": {
+            "mode": "fixed",
+            "fixedColor": "orange"
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "value",
+        "graphMode": "none",
+        "textMode": "auto",
+        "justifyMode": "auto",
+        "orientation": "auto"
+      },
+      "id": 11,
+      "datasource": {
+        "type": "vertamedia-clickhouse-datasource",
+        "uid": "${DS_HANGBAH}"
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 6,
+        "x": 0,
+        "y": 22
+      }
+    },
+    {
+      "type": "stat",
+      "title": "平均分數",
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "vertamedia-clickhouse-datasource",
+            "uid": "${DS_HANGBAH}"
+          },
+          "format": "table",
+          "editorMode": "sql",
+          "dateTimeType": "DATETIME",
+          "dateTimeColDataType": "timestamp",
+          "dateColDataType": "",
+          "extrapolate": false,
+          "skip_comments": true,
+          "add_metadata": false,
+          "round": "0s",
+          "intervalFactor": 1,
+          "interval": "",
+          "query": "SELECT SUM(_sample_interval * double1) / SUM(_sample_interval) AS score FROM hangbah_events WHERE $timeFilter AND blob1 = 'food_eaten'"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "decimals": 1,
+          "color": {
+            "mode": "fixed",
+            "fixedColor": "orange"
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "value",
+        "graphMode": "none",
+        "textMode": "auto",
+        "justifyMode": "auto",
+        "orientation": "auto"
+      },
+      "id": 12,
+      "datasource": {
+        "type": "vertamedia-clickhouse-datasource",
+        "uid": "${DS_HANGBAH}"
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 6,
+        "x": 6,
+        "y": 22
+      }
+    },
+    {
+      "type": "stat",
+      "title": "燒掉的食材",
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "vertamedia-clickhouse-datasource",
+            "uid": "${DS_HANGBAH}"
+          },
+          "format": "table",
+          "editorMode": "sql",
+          "dateTimeType": "DATETIME",
+          "dateTimeColDataType": "timestamp",
+          "dateColDataType": "",
+          "extrapolate": false,
+          "skip_comments": true,
+          "add_metadata": false,
+          "round": "0s",
+          "intervalFactor": 1,
+          "interval": "",
+          "query": "SELECT SUM(_sample_interval) AS n FROM hangbah_events WHERE $timeFilter AND blob1 = 'food_burned'"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "color": {
+            "mode": "fixed",
+            "fixedColor": "orange"
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "value",
+        "graphMode": "none",
+        "textMode": "auto",
+        "justifyMode": "auto",
+        "orientation": "auto"
+      },
+      "id": 13,
+      "datasource": {
+        "type": "vertamedia-clickhouse-datasource",
+        "uid": "${DS_HANGBAH}"
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 6,
+        "x": 12,
+        "y": 22
+      }
+    },
+    {
+      "type": "stat",
+      "title": "刷醬次數",
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "vertamedia-clickhouse-datasource",
+            "uid": "${DS_HANGBAH}"
+          },
+          "format": "table",
+          "editorMode": "sql",
+          "dateTimeType": "DATETIME",
+          "dateTimeColDataType": "timestamp",
+          "dateColDataType": "",
+          "extrapolate": false,
+          "skip_comments": true,
+          "add_metadata": false,
+          "round": "0s",
+          "intervalFactor": 1,
+          "interval": "",
+          "query": "SELECT SUM(_sample_interval) AS n FROM hangbah_events WHERE $timeFilter AND blob1 = 'food_sauced'"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "color": {
+            "mode": "fixed",
+            "fixedColor": "orange"
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "value",
+        "graphMode": "none",
+        "textMode": "auto",
+        "justifyMode": "auto",
+        "orientation": "auto"
+      },
+      "id": 14,
+      "datasource": {
+        "type": "vertamedia-clickhouse-datasource",
+        "uid": "${DS_HANGBAH}"
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 6,
+        "x": 18,
+        "y": 22
+      }
+    },
+    {
+      "type": "barchart",
+      "title": "各食材 放／吃／燒",
+      "description": "custom 是所有自訂食材加總。",
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "vertamedia-clickhouse-datasource",
+            "uid": "${DS_HANGBAH}"
+          },
+          "format": "table",
+          "editorMode": "sql",
+          "dateTimeType": "DATETIME",
+          "dateTimeColDataType": "timestamp",
+          "dateColDataType": "",
+          "extrapolate": false,
+          "skip_comments": true,
+          "add_metadata": false,
+          "round": "0s",
+          "intervalFactor": 1,
+          "interval": "",
+          "query": "SELECT blob2 AS food, sumIf(_sample_interval, blob1 = 'food_spawned') AS spawned, sumIf(_sample_interval, blob1 = 'food_eaten') AS eaten, sumIf(_sample_interval, blob1 = 'food_burned') AS burned FROM hangbah_events WHERE $timeFilter AND blob2 != '' GROUP BY food ORDER BY spawned DESC"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "xField": "food",
+        "orientation": "horizontal",
+        "showValue": "auto",
+        "stacking": "none",
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        }
+      },
+      "id": 15,
+      "datasource": {
+        "type": "vertamedia-clickhouse-datasource",
+        "uid": "${DS_HANGBAH}"
+      },
+      "gridPos": {
+        "h": 9,
+        "w": 12,
+        "x": 0,
+        "y": 26
+      }
+    },
+    {
+      "type": "timeseries",
+      "title": "吃掉 vs 燒掉",
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "vertamedia-clickhouse-datasource",
+            "uid": "${DS_HANGBAH}"
+          },
+          "format": "time_series",
+          "editorMode": "sql",
+          "dateTimeType": "DATETIME",
+          "dateTimeColDataType": "timestamp",
+          "dateColDataType": "",
+          "extrapolate": false,
+          "skip_comments": true,
+          "add_metadata": false,
+          "round": "0s",
+          "intervalFactor": 1,
+          "interval": "",
+          "query": "SELECT $timeSeries AS t, blob1 AS label, SUM(_sample_interval) AS n FROM hangbah_events WHERE $timeFilter AND blob1 IN ('food_eaten', 'food_burned') GROUP BY label, t ORDER BY t"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "drawStyle": "bars",
+            "fillOpacity": 80,
+            "lineWidth": 1,
+            "stacking": {
+              "mode": "normal"
+            }
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "id": 16,
+      "datasource": {
+        "type": "vertamedia-clickhouse-datasource",
+        "uid": "${DS_HANGBAH}"
+      },
+      "gridPos": {
+        "h": 9,
+        "w": 12,
+        "x": 12,
+        "y": 26
+      }
+    },
+    {
+      "type": "table",
+      "title": "各食材完美率與平均分數",
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "vertamedia-clickhouse-datasource",
+            "uid": "${DS_HANGBAH}"
+          },
+          "format": "table",
+          "editorMode": "sql",
+          "dateTimeType": "DATETIME",
+          "dateTimeColDataType": "timestamp",
+          "dateColDataType": "",
+          "extrapolate": false,
+          "skip_comments": true,
+          "add_metadata": false,
+          "round": "0s",
+          "intervalFactor": 1,
+          "interval": "",
+          "query": "SELECT blob2 AS food, SUM(_sample_interval) AS eaten, SUM(_sample_interval * double2) / SUM(_sample_interval) AS perfect_rate, SUM(_sample_interval * double1) / SUM(_sample_interval) AS avg_score, SUM(_sample_interval * double3) / SUM(_sample_interval) AS sauced_rate FROM hangbah_events WHERE $timeFilter AND blob1 = 'food_eaten' GROUP BY food ORDER BY eaten DESC"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "perfect_rate"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "percentunit"
+              },
+              {
+                "id": "decimals",
+                "value": 1
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "sauced_rate"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "percentunit"
+              },
+              {
+                "id": "decimals",
+                "value": 1
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "avg_score"
+            },
+            "properties": [
+              {
+                "id": "decimals",
+                "value": 1
+              }
+            ]
+          }
+        ]
+      },
+      "options": {
+        "showHeader": true
+      },
+      "id": 17,
+      "datasource": {
+        "type": "vertamedia-clickhouse-datasource",
+        "uid": "${DS_HANGBAH}"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 24,
+        "x": 0,
+        "y": 35
+      }
+    },
+    {
+      "id": 18,
+      "type": "row",
+      "title": "上傳與聊天",
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 43
+      },
+      "panels": []
+    },
+    {
+      "type": "stat",
+      "title": "上傳成功",
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "vertamedia-clickhouse-datasource",
+            "uid": "${DS_HANGBAH}"
+          },
+          "format": "table",
+          "editorMode": "sql",
+          "dateTimeType": "DATETIME",
+          "dateTimeColDataType": "timestamp",
+          "dateColDataType": "",
+          "extrapolate": false,
+          "skip_comments": true,
+          "add_metadata": false,
+          "round": "0s",
+          "intervalFactor": 1,
+          "interval": "",
+          "query": "SELECT SUM(_sample_interval) AS n FROM hangbah_events WHERE $timeFilter AND blob1 = 'upload_ok'"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "color": {
+            "mode": "fixed",
+            "fixedColor": "orange"
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "value",
+        "graphMode": "none",
+        "textMode": "auto",
+        "justifyMode": "auto",
+        "orientation": "auto"
+      },
+      "id": 19,
+      "datasource": {
+        "type": "vertamedia-clickhouse-datasource",
+        "uid": "${DS_HANGBAH}"
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 6,
+        "x": 0,
+        "y": 44
+      }
+    },
+    {
+      "type": "stat",
+      "title": "上傳被拒",
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "vertamedia-clickhouse-datasource",
+            "uid": "${DS_HANGBAH}"
+          },
+          "format": "table",
+          "editorMode": "sql",
+          "dateTimeType": "DATETIME",
+          "dateTimeColDataType": "timestamp",
+          "dateColDataType": "",
+          "extrapolate": false,
+          "skip_comments": true,
+          "add_metadata": false,
+          "round": "0s",
+          "intervalFactor": 1,
+          "interval": "",
+          "query": "SELECT SUM(_sample_interval) AS n FROM hangbah_events WHERE $timeFilter AND blob1 = 'upload_rejected'"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "color": {
+            "mode": "fixed",
+            "fixedColor": "orange"
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "value",
+        "graphMode": "none",
+        "textMode": "auto",
+        "justifyMode": "auto",
+        "orientation": "auto"
+      },
+      "id": 20,
+      "datasource": {
+        "type": "vertamedia-clickhouse-datasource",
+        "uid": "${DS_HANGBAH}"
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 6,
+        "x": 6,
+        "y": 44
+      }
+    },
+    {
+      "type": "stat",
+      "title": "聊天訊息",
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "vertamedia-clickhouse-datasource",
+            "uid": "${DS_HANGBAH}"
+          },
+          "format": "table",
+          "editorMode": "sql",
+          "dateTimeType": "DATETIME",
+          "dateTimeColDataType": "timestamp",
+          "dateColDataType": "",
+          "extrapolate": false,
+          "skip_comments": true,
+          "add_metadata": false,
+          "round": "0s",
+          "intervalFactor": 1,
+          "interval": "",
+          "query": "SELECT SUM(_sample_interval) AS n FROM hangbah_events WHERE $timeFilter AND blob1 = 'chat_sent'"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "color": {
+            "mode": "fixed",
+            "fixedColor": "orange"
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "value",
+        "graphMode": "none",
+        "textMode": "auto",
+        "justifyMode": "auto",
+        "orientation": "auto"
+      },
+      "id": 21,
+      "datasource": {
+        "type": "vertamedia-clickhouse-datasource",
+        "uid": "${DS_HANGBAH}"
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 6,
+        "x": 12,
+        "y": 44
+      }
+    },
+    {
+      "type": "stat",
+      "title": "表情",
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "vertamedia-clickhouse-datasource",
+            "uid": "${DS_HANGBAH}"
+          },
+          "format": "table",
+          "editorMode": "sql",
+          "dateTimeType": "DATETIME",
+          "dateTimeColDataType": "timestamp",
+          "dateColDataType": "",
+          "extrapolate": false,
+          "skip_comments": true,
+          "add_metadata": false,
+          "round": "0s",
+          "intervalFactor": 1,
+          "interval": "",
+          "query": "SELECT SUM(_sample_interval) AS n FROM hangbah_events WHERE $timeFilter AND blob1 = 'emote_sent'"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "color": {
+            "mode": "fixed",
+            "fixedColor": "orange"
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "value",
+        "graphMode": "none",
+        "textMode": "auto",
+        "justifyMode": "auto",
+        "orientation": "auto"
+      },
+      "id": 22,
+      "datasource": {
+        "type": "vertamedia-clickhouse-datasource",
+        "uid": "${DS_HANGBAH}"
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 6,
+        "x": 18,
+        "y": 44
+      }
+    },
+    {
+      "type": "barchart",
+      "title": "上傳被拒原因",
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "vertamedia-clickhouse-datasource",
+            "uid": "${DS_HANGBAH}"
+          },
+          "format": "table",
+          "editorMode": "sql",
+          "dateTimeType": "DATETIME",
+          "dateTimeColDataType": "timestamp",
+          "dateColDataType": "",
+          "extrapolate": false,
+          "skip_comments": true,
+          "add_metadata": false,
+          "round": "0s",
+          "intervalFactor": 1,
+          "interval": "",
+          "query": "SELECT blob3 AS reason, SUM(_sample_interval) AS n FROM hangbah_events WHERE $timeFilter AND blob1 = 'upload_rejected' GROUP BY reason ORDER BY n DESC"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "xField": "reason",
+        "orientation": "horizontal",
+        "showValue": "auto",
+        "stacking": "none",
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        }
+      },
+      "id": 23,
+      "datasource": {
+        "type": "vertamedia-clickhouse-datasource",
+        "uid": "${DS_HANGBAH}"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 0,
+        "y": 48
+      }
+    },
+    {
+      "type": "timeseries",
+      "title": "聊天與表情",
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "vertamedia-clickhouse-datasource",
+            "uid": "${DS_HANGBAH}"
+          },
+          "format": "time_series",
+          "editorMode": "sql",
+          "dateTimeType": "DATETIME",
+          "dateTimeColDataType": "timestamp",
+          "dateColDataType": "",
+          "extrapolate": false,
+          "skip_comments": true,
+          "add_metadata": false,
+          "round": "0s",
+          "intervalFactor": 1,
+          "interval": "",
+          "query": "SELECT $timeSeries AS t, blob1 AS label, SUM(_sample_interval) AS n FROM hangbah_events WHERE $timeFilter AND blob1 IN ('chat_sent', 'emote_sent') GROUP BY label, t ORDER BY t"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "drawStyle": "bars",
+            "fillOpacity": 80,
+            "lineWidth": 1,
+            "stacking": {
+              "mode": "normal"
+            }
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "id": 24,
+      "datasource": {
+        "type": "vertamedia-clickhouse-datasource",
+        "uid": "${DS_HANGBAH}"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 8,
+        "y": 48
+      }
+    },
+    {
+      "type": "barchart",
+      "title": "表情排行",
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "vertamedia-clickhouse-datasource",
+            "uid": "${DS_HANGBAH}"
+          },
+          "format": "table",
+          "editorMode": "sql",
+          "dateTimeType": "DATETIME",
+          "dateTimeColDataType": "timestamp",
+          "dateColDataType": "",
+          "extrapolate": false,
+          "skip_comments": true,
+          "add_metadata": false,
+          "round": "0s",
+          "intervalFactor": 1,
+          "interval": "",
+          "query": "SELECT blob3 AS emote, SUM(_sample_interval) AS n FROM hangbah_events WHERE $timeFilter AND blob1 = 'emote_sent' GROUP BY emote ORDER BY n DESC"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "xField": "emote",
+        "orientation": "horizontal",
+        "showValue": "auto",
+        "stacking": "none",
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        }
+      },
+      "id": 25,
+      "datasource": {
+        "type": "vertamedia-clickhouse-datasource",
+        "uid": "${DS_HANGBAH}"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 16,
+        "y": 48
+      }
+    }
+  ]
+}

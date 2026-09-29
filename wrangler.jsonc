@@ -17,6 +17,8 @@
 	},
 	"migrations": [{ "tag": "v1", "new_sqlite_classes": ["BbqRoom"] }],
 	"r2_buckets": [{ "binding": "IMAGES", "bucket_name": "hangbah-online-images" }],
+	// 站長用的使用統計，第一次寫入時自動建立。本機和測試裡寫入不會存下來
+	"analytics_engine_datasets": [{ "binding": "ANALYTICS", "dataset": "hangbah_events" }],
 	"vars": {
 		// 火力倍率。本機測試可在 .dev.vars 調大，不用等好幾分鐘
 		"HEAT_SCALE": "1"

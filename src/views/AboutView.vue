@@ -74,6 +74,7 @@ const openSource = [
         <li>不用註冊，也不需要任何個人資料。</li>
         <li>瀏覽器只會存你的暱稱和音量設定（<code>localStorage</code>），以及這個分頁的玩家代號（<code>sessionStorage</code>）。</li>
         <li>本站不放廣告和追蹤碼，也不載入外部字型或第三方腳本。</li>
+        <li>伺服器會記下匿名的使用統計，例如每天開了幾場、哪種食材最常烤焦。統計裡沒有暱稱、玩家代號、聊天內容和上傳的圖片。</li>
       </ul>
     </section>
   </component>

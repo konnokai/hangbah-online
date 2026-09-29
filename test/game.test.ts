@@ -7,6 +7,7 @@ import {
 	cleanText,
 	donenessAt,
 	heatAt,
+	isPerfect,
 	onGrill,
 	resolveFood,
 	scoreOf,
@@ -95,6 +96,12 @@ describe("計分", () => {
 		expect(stageOf(0.8)).toBe("perfect");
 		expect(stageOf(1.2)).toBe("charred");
 		expect(stageOf(1.5)).toBe("burnt");
+	});
+
+	it("完美要兩面都在剛好的範圍內，含邊界", () => {
+		expect(isPerfect([0.7, 1.0])).toBe(true);
+		expect(isPerfect([0.85, 0.69])).toBe(false);
+		expect(isPerfect([1.01, 0.85])).toBe(false);
 	});
 });
 

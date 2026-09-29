@@ -1,5 +1,6 @@
 import { cleanNickname, cleanText } from "../shared/game";
 import { LIMITS, ROOM_CODE_ALPHABET, ROOM_CODE_RE } from "../shared/limits";
+import { track } from "./analytics";
 import { buildPreview, rewriteRoomHtml } from "./preview";
 import { TooLargeError, readLimited, sniffImage } from "./upload";
 
@@ -33,24 +34,29 @@ async function createRoom(request: Request, env: Env) {
 }
 
 async function uploadFood(request: Request, env: Env, code: string) {
+	const reject = (status: number, error: string) => {
+		track(env.ANALYTICS, "upload_rejected", { room: code, detail: error });
+		return fail(status, error);
+	};
+
 	const length = Number(request.headers.get("Content-Length") ?? "0");
-	if (length > LIMITS.uploadMaxBytes) return fail(413, "file_too_large");
+	if (length > LIMITS.uploadMaxBytes) return reject(413, "file_too_large");
 
 	const stub = room(env, code);
 	const auth = await stub.authorizeUpload(request.headers.get("X-Upload-Token") ?? "");
-	if (!auth.ok) return fail(auth.status, auth.error);
+	if (!auth.ok) return reject(auth.status, auth.error);
 
 	let bytes: Uint8Array;
 	try {
 		bytes = await readLimited(request.body, LIMITS.uploadMaxBytes);
 	} catch (e) {
-		if (e instanceof TooLargeError) return fail(413, "file_too_large");
+		if (e instanceof TooLargeError) return reject(413, "file_too_large");
 		throw e;
 	}
 	const info = sniffImage(bytes);
-	if (!info) return fail(415, "unsupported_image");
+	if (!info) return reject(415, "unsupported_image");
 	if (info.width < 1 || info.height < 1 || info.width > LIMITS.uploadMaxDim || info.height > LIMITS.uploadMaxDim) {
-		return fail(422, "image_too_big");
+		return reject(422, "image_too_big");
 	}
 
 	let name = "";
@@ -66,8 +72,9 @@ async function uploadFood(request: Request, env: Env, code: string) {
 	const food = await stub.addCustomFood(auth.pid, id, name, info.ext);
 	if (!food) {
 		await env.IMAGES.delete(key);
-		return fail(409, "too_many_custom_foods");
+		return reject(409, "too_many_custom_foods");
 	}
+	track(env.ANALYTICS, "upload_ok", { room: code, detail: info.ext, v1: bytes.length });
 	return json(food, 201);
 }
 

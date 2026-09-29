@@ -141,6 +141,11 @@ function sideScore(d: number) {
 	return -2;
 }
 
+/** 兩面都剛好。client 用來播「完美」音效，server 用來記統計。 */
+export function isPerfect(doneness: readonly [number, number]) {
+	return doneness.every((v) => stageOf(v) === "perfect");
+}
+
 export function scoreOf(doneness: [number, number], food: FoodDef, sauced: boolean) {
 	const [a, b] = doneness;
 	const perfectA = stageOf(a) === "perfect";

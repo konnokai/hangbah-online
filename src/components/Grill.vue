@@ -5,11 +5,11 @@ import {
   BURN_WARNING,
   GRILL,
   PERFECT_MAX,
-  PERFECT_MIN,
   TABLE_ASPECT,
   customFoodUrl,
   donenessAt,
   heatAt,
+  isPerfect,
   onGrill,
   resolveFood,
   type GrillItem,
@@ -298,7 +298,7 @@ onMounted(() => {
         startDying(ev.item, d, 'eat')
         const g = ev.mine ? 1 : 0.5
         sfx.play('eat', g)
-        const perfect = d.every((v) => v >= PERFECT_MIN && v <= PERFECT_MAX)
+        const perfect = isPerfect(d)
         if (perfect) sfx.play('perfect', g)
         const score = ev.score ?? 0
         const who = ev.by ? playersById.value[ev.by]?.name : ''
