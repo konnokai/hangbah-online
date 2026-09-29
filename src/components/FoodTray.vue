@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed } from 'vue'
+import { Plus } from '@lucide/vue'
 import { BUILTIN_FOODS, customFoodId, customFoodUrl, type CustomFood } from '@shared/game'
 import { LIMITS } from '@shared/limits'
 import { FOOD_ART } from '@/foods'
@@ -67,7 +68,7 @@ const full = computed(() => props.customFoods.length >= LIMITS.maxCustomFoods)
         <span class="name">{{ c.name }}</span>
       </button>
       <button class="food-btn add" :disabled="full" :title="full ? '自訂食材已達上限' : '上傳圖片做成食材'" @click="emit('upload')">
-        <span class="art plus" aria-hidden="true">＋</span>
+        <span class="art plus"><Plus :size="26" /></span>
         <span class="name">自訂食材</span>
       </button>
     </div>
@@ -150,6 +151,8 @@ h2 {
 .art {
   display: grid;
   place-items: center;
+  /* 列高要固定，不然接近正方形的圖會把列撐高，蓋到下面的名字 */
+  grid-template: 100% / 100%;
   width: 54px;
   height: 40px;
   pointer-events: none;
@@ -166,8 +169,12 @@ h2 {
 }
 
 .plus {
-  font-size: 26px;
   color: var(--gold);
+}
+
+.plus > :deep(svg) {
+  width: 26px;
+  height: 26px;
 }
 
 .add {

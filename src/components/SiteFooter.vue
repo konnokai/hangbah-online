@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { defineAsyncComponent, ref } from 'vue'
 import { RouterLink } from 'vue-router'
+import { X } from '@lucide/vue'
 
 // 用對話框顯示，不切換頁面，在烤肉房間裡點開也不會斷線
 const AboutView = defineAsyncComponent(() => import('../views/AboutView.vue'))
@@ -34,7 +35,7 @@ function onBackdrop(e: MouseEvent) {
     <div class="panel">
       <header class="head">
         <h2 id="about-dialog-title">關於夯肉</h2>
-        <button type="button" class="close" aria-label="關閉" @click="close">✕</button>
+        <button type="button" class="close" aria-label="關閉" @click="close"><X :size="18" /></button>
       </header>
       <div class="body">
         <AboutView v-if="opened" embedded />
@@ -78,7 +79,7 @@ function onBackdrop(e: MouseEvent) {
   border-radius: var(--radius);
   background: var(--bg);
   color: var(--text);
-  box-shadow: var(--shadow);
+  box-shadow: var(--shadow-lg);
   overflow: hidden;
 }
 

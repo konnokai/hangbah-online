@@ -55,7 +55,7 @@ function submit() {
   width: min(380px, 100%);
   padding: 24px 22px;
   text-align: center;
-  box-shadow: var(--shadow);
+  box-shadow: var(--shadow-lg);
 }
 
 h2 {

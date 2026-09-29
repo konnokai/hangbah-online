@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, effectScope, onBeforeUnmount, onMounted, reactive, ref, shallowRef } from 'vue'
 import { RouterLink, onBeforeRouteLeave, useRoute, useRouter } from 'vue-router'
+import { Link } from '@lucide/vue'
 import { BUILTIN_FOODS, customFoodUrl } from '@shared/game'
 import { ROOM_CODE_RE } from '@shared/limits'
 import { useRoom, type Room } from '@/composables/useRoom'
@@ -210,7 +211,7 @@ const ghostWidth = computed(() => {
         </div>
         <div class="actions">
           <SoundControl />
-          <button class="btn btn-sm btn-primary" @click="share">🔗 邀請朋友</button>
+          <button class="btn btn-sm btn-primary" @click="share"><Link :size="16" />邀請朋友</button>
         </div>
       </header>
 
@@ -441,7 +442,7 @@ code {
   border: 1px solid var(--border);
   border-radius: 999px;
   background: var(--surface-3);
-  box-shadow: var(--shadow);
+  box-shadow: var(--shadow-md);
   font-size: 0.9rem;
   white-space: nowrap;
   animation: toast-in 0.2s ease-out;

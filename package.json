@@ -15,6 +15,7 @@
     "icons": "node scripts/build-icons.mjs"
   },
   "dependencies": {
+    "@lucide/vue": "^1.48.0",
     "vue": "^3.5.42",
     "vue-router": "^5.3.1"
   },

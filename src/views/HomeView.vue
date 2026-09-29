@@ -122,7 +122,7 @@ const foodNames = BUILTIN_FOODS.map((f) => f.name).join('、')
 }
 
 .logo {
-  filter: drop-shadow(0 8px 24px rgb(255 100 30 / 0.45));
+  filter: drop-shadow(0 6px 8px rgb(0 0 0 / 0.45));
 }
 
 h1 {
@@ -173,7 +173,7 @@ h1 span {
   max-width: 440px;
   margin: 16px auto 0;
   padding: 20px;
-  box-shadow: var(--shadow);
+  box-shadow: var(--shadow-sm);
 }
 
 .field {

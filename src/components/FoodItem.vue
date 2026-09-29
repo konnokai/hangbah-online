@@ -184,7 +184,6 @@ const style = computed(() => ({
 }
 .dot.perfect {
   background: #7ee07e;
-  box-shadow: 0 0 5px #7ee07e;
 }
 .dot.charred {
   background: #8a5a36;

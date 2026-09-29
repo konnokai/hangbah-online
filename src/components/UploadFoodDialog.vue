@@ -110,7 +110,7 @@ onBeforeUnmount(() => preview.value && URL.revokeObjectURL(preview.value))
 .dialog {
   width: min(420px, 100%);
   padding: 20px;
-  box-shadow: var(--shadow);
+  box-shadow: var(--shadow-lg);
 }
 
 h2 {

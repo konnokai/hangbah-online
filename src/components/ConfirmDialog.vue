@@ -63,7 +63,7 @@ defineExpose({ ask })
   border-radius: var(--radius);
   background: var(--surface);
   color: var(--text);
-  box-shadow: var(--shadow);
+  box-shadow: var(--shadow-lg);
 }
 
 .confirm::backdrop {

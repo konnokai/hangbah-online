@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { Volume2, VolumeX } from '@lucide/vue'
 import { sfx, soundSettings } from '@/audio/sfx'
 
 function toggle() {
@@ -16,7 +17,8 @@ function toggle() {
       :title="soundSettings.muted ? '開啟音效' : '關閉音效'"
       @click="toggle"
     >
-      {{ soundSettings.muted || soundSettings.volume === 0 ? '🔇' : '🔊' }}
+      <VolumeX v-if="soundSettings.muted || soundSettings.volume === 0" :size="18" />
+      <Volume2 v-else :size="18" />
     </button>
     <input
       v-model.number="soundSettings.volume"

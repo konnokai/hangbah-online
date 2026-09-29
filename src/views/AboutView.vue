@@ -8,6 +8,7 @@ const openSource = [
   { name: 'Vue', license: 'MIT', url: 'https://github.com/vuejs/core' },
   { name: 'Vue Router', license: 'MIT', url: 'https://github.com/vuejs/router' },
   { name: 'Vite', license: 'MIT', url: 'https://github.com/vitejs/vite' },
+  { name: 'Lucide（介面圖示）', license: 'ISC', url: 'https://github.com/lucide-icons/lucide' },
   { name: 'Cloudflare Workers SDK（Wrangler、Vite plugin）', license: 'MIT / Apache-2.0', url: 'https://github.com/cloudflare/workers-sdk' },
   { name: 'resvg-js（只在產生圖示時使用）', license: 'MPL-2.0', url: 'https://github.com/thx/resvg-js' },
 ]
