@@ -8,6 +8,9 @@ import { loadJSON, saveJSON } from '@/utils/storage'
 
 const SETTINGS_KEY = 'hangbah:sound'
 
+// 持續滋滋聲的音量倍率
+const SIZZLE_BED_GAIN = 0.16
+
 export const soundSettings = reactive(loadJSON(SETTINGS_KEY, { volume: 0.7, muted: false }))
 
 export type SfxName = 'place' | 'flip' | 'warn' | 'charred' | 'burn' | 'eat' | 'perfect' | 'join' | 'chat' | 'sauce'
@@ -19,6 +22,7 @@ class Sfx {
   private noise!: AudioBuffer
   private sizzleLevel = 0
   private crackleTimer: ReturnType<typeof setInterval> | null = null
+  private fireOn = false
 
   constructor() {
     watch(soundSettings, (s) => {
@@ -78,17 +82,22 @@ class Sfx {
     this.sizzleGain.gain.value = 0
     src.connect(hp).connect(bp).connect(this.sizzleGain).connect(this.master)
     src.start()
-    // 隨機的油爆聲，讓滋滋聲不會太單調
+    // 木炭隨機爆裂。炭火一直燒著，烤架上沒東西也會爆，平均 2–3 秒一次；食材多、火旺時爆得勤一點
     this.crackleTimer = setInterval(() => {
-      if (this.sizzleLevel > 0.02 && Math.random() < this.sizzleLevel * 0.9) this.crackle(0.25 * this.sizzleLevel)
-    }, 90)
+      if (this.fireOn && Math.random() < 0.08 + 0.12 * this.sizzleLevel) this.charcoalPop()
+    }, 250)
+  }
+
+  /** 烤架畫面出現時開、離開時關，不然回到首頁還會聽到木炭爆。 */
+  setFire(on: boolean) {
+    this.fireOn = on
   }
 
   /** level 0–1：烤架上的東西越多、火越大就越大聲。 */
   setSizzle(level: number) {
     this.sizzleLevel = Math.max(0, Math.min(1, level))
     if (!this.ctx) return
-    this.sizzleGain.gain.setTargetAtTime(this.sizzleLevel * 0.16, this.ctx.currentTime, 0.4)
+    this.sizzleGain.gain.setTargetAtTime(this.sizzleLevel * SIZZLE_BED_GAIN, this.ctx.currentTime, 0.4)
   }
 
   private swell(amount: number, seconds: number) {
@@ -96,8 +105,8 @@ class Sfx {
     const g = this.sizzleGain.gain
     const t = this.ctx.currentTime
     g.cancelScheduledValues(t)
-    g.setTargetAtTime(Math.min(0.3, this.sizzleLevel * 0.16 + amount), t, 0.02)
-    g.setTargetAtTime(this.sizzleLevel * 0.16, t + seconds, 0.35)
+    g.setTargetAtTime(Math.min(0.3, this.sizzleLevel * SIZZLE_BED_GAIN + amount), t, 0.02)
+    g.setTargetAtTime(this.sizzleLevel * SIZZLE_BED_GAIN, t + seconds, 0.35)
   }
 
   // ---------- 小工具 ----------
@@ -159,6 +168,19 @@ class Sfx {
 
   private crackle(gain: number, at?: number) {
     this.noiseBurst({ at, duration: 0.012 + Math.random() * 0.02, gain, type: 'bandpass', freq: 2000 + Math.random() * 3000, q: 2 })
+  }
+
+  /** 木炭裂開：低頻的「砰」疊一聲很短的高頻「啪」，有時候後面再細碎地劈啪幾下。音量調到跟放食材差不多，太小聲會被忽略 */
+  private charcoalPop() {
+    if (!this.ctx || this.ctx.state !== 'running') return
+    const t = this.ctx.currentTime
+    const g = 0.6 + Math.random() * 0.5
+    this.noiseBurst({ at: t, duration: 0.07 + Math.random() * 0.05, gain: 0.6 * g, type: 'bandpass', freq: 500 + Math.random() * 400, freqEnd: 250, q: 1.2, attack: 0.002 })
+    this.noiseBurst({ at: t, duration: 0.015, gain: 0.5 * g, type: 'highpass', freq: 3000, attack: 0.001 })
+    if (Math.random() < 0.35) {
+      const n = 2 + Math.floor(Math.random() * 3)
+      for (let i = 0; i < n; i++) this.crackle(0.2 * g, t + 0.05 + Math.random() * 0.2)
+    }
   }
 
   // ---------- 音效 ----------

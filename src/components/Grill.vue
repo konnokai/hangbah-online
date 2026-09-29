@@ -270,6 +270,7 @@ function checkThresholds() {
 let off: (() => void) | null = null
 
 onMounted(() => {
+  sfx.setFire(true)
   raf = requestAnimationFrame(loop)
   window.addEventListener('pointermove', onWindowMove)
   window.addEventListener('pointerup', onWindowUp)
@@ -332,6 +333,7 @@ onBeforeUnmount(() => {
   if (tapTimer) clearTimeout(tapTimer)
   off?.()
   sfx.setSizzle(0)
+  sfx.setFire(false)
 })
 
 // ---------- 烤架外觀：用固定亂數種子產生炭塊，每次畫面都一樣 ----------
