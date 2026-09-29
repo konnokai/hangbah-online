@@ -177,11 +177,19 @@ async function share() {
 }
 
 // ---------- 從食材盤拖出來 ----------
-const trayDrag = reactive({ active: false, foodId: '', x: 0, y: 0, sx: 0, sy: 0, moved: false, pointerId: -1 })
+const trayDrag = reactive({ active: false, foodId: '', x: 0, y: 0, sx: 0, sy: 0, moved: false, peeking: false, pointerId: -1 })
+
+// 按住不動一段時間就放大預覽，看清楚別人上傳了什麼。放開只收起預覽，不放上烤架；預覽中拖動就照常拖曳
+const PEEK_MS = 450
+let peekTimer: ReturnType<typeof setTimeout> | undefined
 
 function onTrayPress(foodId: string, e: PointerEvent) {
   sfx.unlock()
-  Object.assign(trayDrag, { active: true, foodId, x: e.clientX, y: e.clientY, sx: e.clientX, sy: e.clientY, moved: false, pointerId: e.pointerId })
+  Object.assign(trayDrag, { active: true, foodId, x: e.clientX, y: e.clientY, sx: e.clientX, sy: e.clientY, moved: false, peeking: false, pointerId: e.pointerId })
+  clearTimeout(peekTimer)
+  peekTimer = setTimeout(() => {
+    if (trayDrag.active && !trayDrag.moved) trayDrag.peeking = true
+  }, PEEK_MS)
   window.addEventListener('pointermove', onTrayMove)
   window.addEventListener('pointerup', onTrayUp)
   window.addEventListener('pointercancel', onTrayCancel)
@@ -191,11 +199,17 @@ function onTrayMove(e: PointerEvent) {
   if (e.pointerId !== trayDrag.pointerId) return
   trayDrag.x = e.clientX
   trayDrag.y = e.clientY
-  if (Math.hypot(e.clientX - trayDrag.sx, e.clientY - trayDrag.sy) > 6) trayDrag.moved = true
+  if (!trayDrag.moved && Math.hypot(e.clientX - trayDrag.sx, e.clientY - trayDrag.sy) > 6) {
+    trayDrag.moved = true
+    trayDrag.peeking = false
+    clearTimeout(peekTimer)
+  }
 }
 
 function endTray() {
   trayDrag.active = false
+  trayDrag.peeking = false
+  clearTimeout(peekTimer)
   window.removeEventListener('pointermove', onTrayMove)
   window.removeEventListener('pointerup', onTrayUp)
   window.removeEventListener('pointercancel', onTrayCancel)
@@ -203,9 +217,9 @@ function endTray() {
 
 function onTrayUp(e: PointerEvent) {
   if (e.pointerId !== trayDrag.pointerId) return
-  const { foodId, moved } = trayDrag
+  const { foodId, moved, peeking } = trayDrag
   endTray()
-  if (!grill.value) return
+  if (peeking || !grill.value) return
   if (moved) grill.value.spawnAt(foodId, e.clientX, e.clientY)
   else grill.value.spawnRandom(foodId)
 }
@@ -217,6 +231,11 @@ const ghostImage = computed(() => {
   if (!trayDrag.foodId.startsWith('c:') || !room.value) return null
   const c = room.value.state.customFoods.find((f) => `c:${f.id}` === trayDrag.foodId)
   return c ? customFoodUrl(code, c) : null
+})
+const trayFoodName = computed(() => {
+  const id = trayDrag.foodId
+  if (!id.startsWith('c:')) return BUILTIN_FOODS.find((b) => b.id === id)?.name ?? ''
+  return room.value?.state.customFoods.find((f) => `c:${f.id}` === id)?.name ?? ''
 })
 const ghostWidth = computed(() => {
   const f = BUILTIN_FOODS.find((b) => b.id === trayDrag.foodId)
@@ -344,6 +363,16 @@ const ghostWidth = computed(() => {
     >
       <component :is="FOOD_ART[trayDrag.foodId]" v-if="FOOD_ART[trayDrag.foodId]" :d="0" :sauced="false" />
       <img v-else-if="ghostImage" :src="ghostImage" alt="" />
+    </div>
+
+    <div v-if="trayDrag.active && trayDrag.peeking" class="peek" aria-hidden="true">
+      <div class="peek-card">
+        <div class="peek-art">
+          <component :is="FOOD_ART[trayDrag.foodId]" v-if="FOOD_ART[trayDrag.foodId]" :d="0" :sauced="false" />
+          <img v-else-if="ghostImage" :src="ghostImage" alt="" />
+        </div>
+        <p class="peek-name">{{ trayFoodName }}</p>
+      </div>
     </div>
 
     <ConfirmDialog
@@ -603,6 +632,59 @@ code {
 
 .ghost img {
   width: 100%;
+}
+
+/* 預覽只負責看，不吃滑鼠事件，放開的 pointerup 才會照常傳到 window */
+.peek {
+  position: fixed;
+  inset: 0;
+  z-index: 300;
+  display: grid;
+  place-items: center;
+  padding: 16px;
+  background: rgb(0 0 0 / 0.55);
+  pointer-events: none;
+  animation: peek-in 0.15s ease-out;
+}
+
+.peek-card {
+  display: grid;
+  justify-items: center;
+  gap: 10px;
+  padding: 16px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+  box-shadow: var(--shadow-lg);
+}
+
+/* 上傳的圖最長邊是 256px，放到 300px 左右還算清楚 */
+.peek-art {
+  display: grid;
+  place-items: center;
+  width: min(300px, 70vw);
+  aspect-ratio: 1;
+}
+
+.peek-art > :deep(svg),
+.peek-art img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+.peek-name {
+  max-width: min(300px, 70vw);
+  margin: 0;
+  font-weight: 700;
+  text-align: center;
+  overflow-wrap: anywhere;
+}
+
+@keyframes peek-in {
+  from {
+    opacity: 0;
+  }
 }
 
 .toasts {

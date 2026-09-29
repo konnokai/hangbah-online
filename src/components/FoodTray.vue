@@ -68,7 +68,7 @@ watch(
       </div>
     </div>
     <p class="hint">
-      把食材<strong>拖到烤架上</strong>就開始烤（點一下會隨機放上去）。
+      把食材<strong>拖到烤架上</strong>就開始烤（點一下隨機放上去，按住不動可以看大圖）。
       <template v-if="tool === 'tongs'">夾子：拖曳移動、點一下翻面、點兩下吃掉。</template>
       <template v-else>刷醬：點一下食材刷上烤肉醬，烤得剛好再吃分數更高。</template>
     </p>
@@ -80,6 +80,7 @@ watch(
           class="food-btn"
           :title="f.name"
           @pointerdown.prevent="emit('press', f.id, $event)"
+          @contextmenu.prevent
         >
           <span class="art"><component :is="FOOD_ART[f.id]" :d="0" :sauced="false" /></span>
           <span class="name">{{ f.name }}</span>
@@ -90,6 +91,7 @@ watch(
           class="food-btn"
           :title="c.name"
           @pointerdown.prevent="emit('press', c.id, $event)"
+          @contextmenu.prevent
         >
           <span class="art"><img :src="c.url" alt="" draggable="false" /></span>
           <span class="name">{{ c.name }}</span>
@@ -235,6 +237,8 @@ h2 {
   background: var(--surface-2);
   touch-action: none;
   user-select: none;
+  /* 手機按住會跳出系統選單（存圖、分享），會蓋掉長按預覽 */
+  -webkit-touch-callout: none;
   cursor: grab;
   transition:
     border-color 0.15s,
