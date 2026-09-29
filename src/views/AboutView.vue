@@ -63,7 +63,7 @@ const openSource = [
         <li>只能上傳你自己有權使用的圖片，不要上傳色情、暴力或侵權的內容。</li>
         <li>支援 PNG、JPEG、WebP。圖片會先在你的瀏覽器縮到 {{ LIMITS.clientResizeDim }}px 再上傳，上限 {{ LIMITS.uploadMaxBytes / 1024 }} KB、{{ LIMITS.uploadMaxDim }}×{{ LIMITS.uploadMaxDim }}。</li>
         <li>上傳的圖片只在那個房間使用。房間 24 小時沒人就會收攤，圖片會一起刪除。</li>
-        <li>分享房間連結到 Discord 時，預覽卡片可能會顯示房間裡的自訂食材圖。</li>
+        <li>分享房間連結時，預覽卡片不會顯示上傳的圖片。</li>
       </ul>
     </section>
 

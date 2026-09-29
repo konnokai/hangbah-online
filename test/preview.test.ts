@@ -44,7 +44,6 @@ const base: RoomPreview = {
 	online: ["阿明", "小美"],
 	itemsOnGrill: 12,
 	top: { name: "小美", score: 120 },
-	customFoods: [{ id: "11111111-1111-4111-8111-111111111111", ext: "webp", name: "蝦子" }],
 };
 
 const baseHtml = () =>
@@ -60,7 +59,9 @@ describe("Discord component embed", () => {
 		const json = JSON.stringify(meta.embed);
 		expect(json).toContain("阿明的烤肉場");
 		expect(json).toContain(`${ORIGIN}/r/ABC234`);
-		expect(json).toContain(`${ORIGIN}/api/img/ABC234/${base.customFoods[0]!.id}.webp`);
+		// 使用者上傳的圖不放進站外預覽
+		expect(allTypes(meta.embed.component)).not.toContain(12);
+		expect(json).not.toContain("/api/img/");
 	});
 
 	it("玩家很多、名字很長時自動拿掉內容，不超過 3000 bytes", () => {

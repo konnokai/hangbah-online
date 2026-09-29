@@ -1,4 +1,3 @@
-import { customFoodUrl } from "../shared/game";
 import type { RoomPreview } from "../shared/protocol";
 
 /*
@@ -105,20 +104,11 @@ export function buildPreview(p: RoomPreview, origin: string): PreviewMeta {
 		components: [text(`## 🔥 ${escapeMarkdown(title)}`), text(`-# 房號 ${p.code} · ${SITE_NAME}`)],
 		accessory: { type: 11, media: { url: logo }, description: SITE_NAME },
 	};
-	const gallery: Component | null = p.customFoods.length
-		? {
-				type: 12,
-				items: p.customFoods.slice(0, 4).map((f) => ({
-					media: { url: origin + customFoodUrl(p.code, f) },
-					description: truncate(f.name, 40),
-				})),
-			}
-		: null;
+	// 不放自訂食材圖：那是使用者上傳的，不該被帶到站外放大顯示
 	const footer = [separator(true, 2), { type: 1, components: [linkButton("加入烤肉", url, "🔥")] }];
 
 	// 超過 Discord 限制整個卡片會消失，所以依序拿掉比較不重要的部分
 	const variants: Component[][] = [
-		[header, text(stats), text(who), ...(gallery ? [separator(false, 2), gallery] : []), ...footer],
 		[header, text(stats), text(who), ...footer],
 		[header, text(stats), ...footer],
 	];

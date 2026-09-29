@@ -127,17 +127,13 @@ export class BbqRoom extends DurableObject<Env> {
 
 	async getPreview(): Promise<RoomPreview> {
 		const code = this.meta("code") ?? "";
-		if (!code) return { exists: false, code, host: "", online: [], itemsOnGrill: 0, top: null, customFoods: [] };
+		if (!code) return { exists: false, code, host: "", online: [], itemsOnGrill: 0, top: null };
 		const online = [...new Set(this.attachments().map((a) => a.name))];
 		const items = this.loadItems().filter((i) => onGrill(i.x, i.y)).length;
 		const top = this.sql
 			.exec<{ name: string; score: number }>("SELECT name, score FROM players WHERE score > 0 ORDER BY score DESC LIMIT 1")
 			.toArray()[0];
-		const customFoods = this.sql
-			.exec<{ id: string; ext: string; name: string }>("SELECT id, ext, name FROM custom_foods ORDER BY created_at DESC LIMIT 4")
-			.toArray()
-			.map((r) => ({ id: r.id, ext: r.ext as CustomFood["ext"], name: r.name }));
-		return { exists: true, code, host: this.meta("host") ?? "", online, itemsOnGrill: items, top: top ?? null, customFoods };
+		return { exists: true, code, host: this.meta("host") ?? "", online, itemsOnGrill: items, top: top ?? null };
 	}
 
 	/** 上傳前檢查：token 要屬於目前在線的連線、沒超過頻率和數量上限。 */

@@ -61,5 +61,4 @@ export interface RoomPreview {
 	online: string[];
 	itemsOnGrill: number;
 	top: { name: string; score: number } | null;
-	customFoods: Pick<CustomFood, "id" | "ext" | "name">[];
 }
