@@ -1,11 +1,12 @@
 <script setup lang="ts">
-import { computed, effectScope, onBeforeUnmount, onMounted, reactive, ref, shallowRef } from 'vue'
+import { computed, effectScope, onBeforeUnmount, onMounted, reactive, ref, shallowRef, watch } from 'vue'
 import { RouterLink, onBeforeRouteLeave, useRoute, useRouter } from 'vue-router'
 import { Link } from '@lucide/vue'
 import { BUILTIN_FOODS, customFoodUrl } from '@shared/game'
 import { ROOM_CODE_RE } from '@shared/limits'
 import { useRoom, type Room } from '@/composables/useRoom'
-import { loadName, saveName } from '@/utils/storage'
+import { useMutedPlayers } from '@/composables/useMutedPlayers'
+import { loadJSON, loadName, saveJSON, saveName } from '@/utils/storage'
 import { sfx } from '@/audio/sfx'
 import { FOOD_ART } from '@/foods'
 import Grill, { type Tool } from '@/components/Grill.vue'
@@ -16,6 +17,7 @@ import SoundControl from '@/components/SoundControl.vue'
 import NicknameDialog from '@/components/NicknameDialog.vue'
 import UploadFoodDialog from '@/components/UploadFoodDialog.vue'
 import ConfirmDialog from '@/components/ConfirmDialog.vue'
+import Danmaku from '@/components/Danmaku.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -31,6 +33,14 @@ const tool = ref<Tool>('tongs')
 const showUpload = ref(false)
 
 const title = computed(() => (host.value ? `${host.value}的烤肉場` : '烤肉場'))
+
+// ---------- 聊天：隱藏名單、彈幕 ----------
+const muted = useMutedPlayers(code)
+const danmaku = ref<InstanceType<typeof Danmaku> | null>(null)
+const DANMAKU_KEY = 'hangbah:danmaku'
+const danmakuOn = ref(loadJSON(DANMAKU_KEY, { on: true }).on !== false)
+watch(danmakuOn, (on) => saveJSON(DANMAKU_KEY, { on }))
+const visibleChat = computed(() => room.value?.state.chat.filter((l) => !muted.isMuted(l.pid)) ?? [])
 
 // ---------- 提示訊息 ----------
 const toasts = reactive<{ key: number; text: string }[]>([])
@@ -75,8 +85,11 @@ function join(name: string) {
     if (ev.type === 'joined') {
       sfx.play('join')
       toast(`${ev.name} 來烤肉了`)
-    } else if (ev.type === 'chat' && !ev.mine) {
-      sfx.play('chat')
+    } else if (ev.type === 'chat') {
+      if (muted.isMuted(ev.line.pid)) return
+      if (!ev.mine) sfx.play('chat')
+      // 只有連線後收到的新訊息會飄，進房時載入的歷史不飄
+      danmaku.value?.push({ name: ev.line.name, text: ev.line.text, color: ev.line.color })
     } else if (ev.type === 'error' && ev.code !== 'room_full') {
       toast(ev.message)
     }
@@ -223,7 +236,11 @@ const ghostWidth = computed(() => {
 
       <div class="layout">
         <div class="stage">
-          <Grill ref="grill" :room="room" :code="code" :tool="tool" />
+          <div class="board">
+            <Grill ref="grill" :room="room" :code="code" :tool="tool" :muted-pids="muted.pids.value" />
+            <PlayerList class="desktop-only" variant="overlay" :players="room.state.players" :you="room.state.you.pid" />
+            <Danmaku ref="danmaku" :enabled="danmakuOn" />
+          </div>
           <p class="legend" aria-hidden="true">
             <span><i class="dot raw" />生</span>
             <span><i class="dot perfect" />剛好</span>
@@ -239,11 +256,17 @@ const ghostWidth = computed(() => {
             @press="onTrayPress"
             @upload="showUpload = true"
           />
-          <PlayerList :players="room.state.players" :you="room.state.you.pid" />
+          <PlayerList class="mobile-only" :players="room.state.players" :you="room.state.you.pid" />
           <ChatBox
-            :lines="room.state.chat"
+            v-model:danmaku="danmakuOn"
+            class="chat-panel"
+            :lines="visibleChat"
+            :you="room.state.you.pid"
+            :muted="muted.list"
             @say="(text) => room?.send({ t: 'chat', text })"
             @emote="(e) => room?.send({ t: 'emote', e })"
+            @mute="(pid, name) => muted.mute(pid, name)"
+            @unmute="(pid) => muted.unmute(pid)"
           />
         </aside>
       </div>
@@ -377,9 +400,36 @@ code {
   align-items: start;
 }
 
+/* 排行榜和彈幕疊在烤架上，所以烤架外面要多包一層定位用的容器 */
+.board {
+  position: relative;
+}
+
+/*
+ * 電腦版右欄：固定在畫面上，高度跟著視窗，聊天室吃掉食材盤以外的所有空間。
+ * 排行榜移到烤架左上角，右欄就不放了。
+ */
 .side {
-  display: grid;
+  position: sticky;
+  top: 12px;
+  display: flex;
+  flex-direction: column;
   gap: 12px;
+  max-height: calc(100dvh - 24px);
+  min-height: 520px;
+}
+
+.chat-panel {
+  flex: 1;
+  min-height: 280px;
+}
+
+.chat-panel :deep(.lines) {
+  max-height: none;
+}
+
+.mobile-only {
+  display: none;
 }
 
 .legend {
@@ -460,8 +510,25 @@ code {
     grid-template-columns: 1fr;
   }
 
+  /* 手機、平板烤架太小，排行榜不疊上去，回到卡片 */
   .side {
+    position: static;
+    display: grid;
     grid-template-columns: 1fr;
+    max-height: none;
+    min-height: 0;
+  }
+
+  .chat-panel :deep(.lines) {
+    max-height: 240px;
+  }
+
+  .desktop-only {
+    display: none;
+  }
+
+  .mobile-only {
+    display: block;
   }
 }
 

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, onBeforeUnmount, ref, watch } from 'vue'
 import { BURN_WARNING, PERFECT_MAX, stageOf, type FoodDef, type Stage } from '@shared/game'
 import { FOOD_ART, FOOD_ASPECT } from '@/foods'
 
@@ -10,15 +10,44 @@ const props = defineProps<{
   x: number
   y: number
   rot: number
-  /** [朝上那面, 朝下那面] 的熟度 */
+  /** 朝上那面、朝下那面的熟度 */
   up: number
   down: number
+  /** 哪一面朝下。變了就代表剛翻面 */
+  side: 0 | 1
   sauced: boolean
   holder: { name: string; color: string } | null
   lifted: boolean
   dying: 'burn' | 'eat' | null
   interactive: boolean
 }>()
+
+// ---------- 翻面動畫 ----------
+// 翻面時 up / down 會立刻對調。先把舊的兩面凍結住，轉到側面（看不到正面）時才換成新的，
+// 不然會在動畫一開始就先變色，看起來像換了一塊肉。
+const FLIP_MS = 440
+const flipping = ref(false)
+const frozen = ref<{ up: number; down: number } | null>(null)
+const timers: ReturnType<typeof setTimeout>[] = []
+const reducedMotion = typeof matchMedia === 'function' ? matchMedia('(prefers-reduced-motion: reduce)') : null
+
+watch(
+  () => [props.side, props.up, props.down] as const,
+  ([side], [prevSide, prevUp, prevDown]) => {
+    if (side === prevSide || props.dying || props.lifted || reducedMotion?.matches) return
+    timers.splice(0).forEach(clearTimeout)
+    frozen.value = { up: prevUp, down: prevDown }
+    // 連續翻兩次時要重新播，先拿掉 class 再加回去
+    flipping.value = false
+    requestAnimationFrame(() => (flipping.value = true))
+    timers.push(setTimeout(() => (frozen.value = null), FLIP_MS / 2))
+    timers.push(setTimeout(() => (flipping.value = false), FLIP_MS + 40))
+  },
+)
+onBeforeUnmount(() => timers.forEach(clearTimeout))
+
+const shownUp = computed(() => frozen.value?.up ?? props.up)
+const shownDown = computed(() => frozen.value?.down ?? props.down)
 
 const art = computed(() => FOOD_ART[props.foodId] ?? null)
 const aspect = computed(() => FOOD_ASPECT[props.foodId] ?? 1)
@@ -31,12 +60,12 @@ const title = computed(
 
 // 點陣圖沒辦法換顏色，用濾鏡模擬變熟變焦
 const imageFilter = computed(() => {
-  const d = props.up
+  const d = shownUp.value
   const sepia = Math.min(1, d / PERFECT_MAX) * 0.55
   const dark = Math.max(0, Math.min(1, (d - 0.9) / 0.6))
   return `sepia(${sepia.toFixed(2)}) saturate(${(1 + d * 0.25).toFixed(2)}) brightness(${(1 - dark * 0.8).toFixed(2)})`
 })
-const imageMarks = computed(() => Math.max(0, Math.min(0.85, (props.up - 0.35) / 0.75)))
+const imageMarks = computed(() => Math.max(0, Math.min(0.85, (shownUp.value - 0.35) / 0.75)))
 
 const style = computed(() => ({
   left: `${props.x * 100}%`,
@@ -54,6 +83,7 @@ const style = computed(() => ({
       warning: !dying && hottest >= BURN_WARNING,
       burning: dying === 'burn',
       eating: dying === 'eat',
+      flipping,
       interactive,
     }"
     :style="style"
@@ -62,7 +92,7 @@ const style = computed(() => ({
     :aria-label="title"
   >
     <div class="body" :style="{ aspectRatio: aspect }">
-      <component :is="art" v-if="art" :d="up" :sauced="sauced" />
+      <component :is="art" v-if="art" :d="shownUp" :sauced="sauced" />
       <div v-else-if="imageUrl" class="custom">
         <img :src="imageUrl" alt="" draggable="false" :style="{ filter: imageFilter }" />
         <div
@@ -84,8 +114,8 @@ const style = computed(() => ({
       </template>
     </div>
     <div v-if="!dying" class="gauge" aria-hidden="true">
-      <span :class="`dot ${stageOf(up)}`" />
-      <span :class="`dot ${stageOf(down)}`" />
+      <span :class="`dot ${stageOf(shownUp)}`" />
+      <span :class="`dot ${stageOf(shownDown)}`" />
     </div>
     <div v-if="holder" class="holder" :style="{ background: holder.color }">{{ holder.name }}</div>
   </div>
@@ -355,6 +385,48 @@ const style = computed(() => ({
     opacity: 0;
     transform: translate(var(--dx, 4px), -46px) scale(2.4);
     background: #4a4540;
+  }
+}
+
+/*
+ * 翻面：夾起來往上跳、沿長軸轉到側面、換面後轉回來、落下時稍微壓扁。
+ * 49.9% → 50% 從 90° 直接跳到 -90°，新的一面才會以正確方向轉進來，不會看到鏡像的背面。
+ */
+.food.flipping {
+  z-index: 40;
+  animation: flip-shadow 0.44s ease-in-out;
+}
+
+.food.flipping .body {
+  animation: flip 0.44s ease-in-out;
+}
+
+@keyframes flip {
+  0% {
+    transform: perspective(500px) translateY(0) rotateX(0deg);
+  }
+  49.9% {
+    transform: perspective(500px) translateY(-22%) rotateX(90deg) scale(1.06);
+  }
+  50% {
+    transform: perspective(500px) translateY(-22%) rotateX(-90deg) scale(1.06);
+  }
+  82% {
+    transform: perspective(500px) translateY(0) rotateX(0deg) scaleY(0.9);
+  }
+  100% {
+    transform: perspective(500px) translateY(0) rotateX(0deg) scaleY(1);
+  }
+}
+
+/* 跳起來時影子往下拉遠、變淡，看得出離開烤架 */
+@keyframes flip-shadow {
+  0%,
+  100% {
+    filter: drop-shadow(0 3px 3px rgb(0 0 0 / 0.5));
+  }
+  50% {
+    filter: drop-shadow(0 12px 8px rgb(0 0 0 / 0.3));
   }
 }
 

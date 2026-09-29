@@ -20,7 +20,7 @@ import FoodItem from './FoodItem.vue'
 
 export type Tool = 'tongs' | 'brush'
 
-const props = defineProps<{ room: Room; code: string; tool: Tool }>()
+const props = defineProps<{ room: Room; code: string; tool: Tool; mutedPids?: ReadonlySet<string> }>()
 const { state, send, now } = props.room
 
 const tableEl = ref<HTMLDivElement | null>(null)
@@ -363,8 +363,9 @@ const grillStyle = {
   height: `${(GRILL.y1 - GRILL.y0) * 100}%`,
 }
 
+// 被隱藏的玩家送的表情也不顯示，表情一樣可以拿來洗版
 const emoteSpots = computed(() =>
-  state.emotes.map((em, i) => {
+  state.emotes.filter((em) => !props.mutedPids?.has(em.pid)).map((em, i) => {
     const c = em.pid === state.you.pid ? null : state.cursors[em.pid]
     return { ...em, x: c ? c.x : 0.5 + ((i % 5) - 2) * 0.06, y: c ? c.y : 0.9 }
   }),
@@ -415,6 +416,7 @@ const emoteSpots = computed(() =>
       :rot="v.item.rot"
       :up="v.d[v.item.down === 0 ? 1 : 0]"
       :down="v.d[v.item.down]"
+      :side="v.item.down"
       :sauced="v.item.sauced"
       :holder="v.holder"
       :lifted="v.lifted"
@@ -433,6 +435,7 @@ const emoteSpots = computed(() =>
       :rot="x.item.rot"
       :up="x.d[x.item.down === 0 ? 1 : 0]"
       :down="x.d[x.item.down]"
+      :side="x.item.down"
       :sauced="x.item.sauced"
       :holder="null"
       :lifted="false"

@@ -130,6 +130,40 @@ describe("烤肉動作", () => {
 		b.close();
 	});
 
+	it("同一個瀏覽器的兩個分頁（同一個 pid）只算一個玩家", async () => {
+		const code = await createRoom();
+		const pid = "same-browser-pid";
+		const tab1 = await Client.connect(code, "阿明", pid);
+		await tab1.next("welcome");
+		const tab2 = await Client.connect(code, "阿明", pid);
+		const w = await tab2.next("welcome");
+		expect(w.players.filter((p) => p.name === "阿明")).toHaveLength(1);
+		expect(w.players.find((p) => p.pid === pid)?.online).toBe(true);
+
+		// 關掉其中一個分頁，另一個還開著，所以還是在線
+		tab1.close();
+		const after = await tab2.next("players", (m) => m.players.some((p) => p.pid === pid));
+		expect(after.players.filter((p) => p.pid === pid)).toEqual([expect.objectContaining({ online: true })]);
+		tab2.close();
+	});
+
+	it("同一個 pid 的某個分頁夾著食材關掉，另一個分頁還開著也會放開", async () => {
+		const code = await createRoom();
+		const pid = "same-browser-pid-2";
+		const tab1 = await Client.connect(code, "阿明", pid);
+		await tab1.next("welcome");
+		const tab2 = await Client.connect(code, "阿明", pid);
+		await tab2.next("welcome");
+		tab1.send({ t: "spawn", foodId: "toast", x: 0.03, y: 0.03 });
+		const id = (await tab2.next("item", (m) => m.action === "spawn")).item.id;
+		tab1.send({ t: "grab", id });
+		await tab2.next("item", (m) => m.action === "grab");
+		tab1.close();
+		const released = await tab2.next("item", (m) => m.action === "release" && m.item.id === id);
+		expect(released.item.heldBy).toBeNull();
+		tab2.close();
+	});
+
 	it("不合法的輸入會被忽略", async () => {
 		const code = await createRoom();
 		const a = await Client.connect(code, "阿明");

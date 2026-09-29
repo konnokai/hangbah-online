@@ -21,13 +21,15 @@ const PID_KEY = 'hangbah:pid'
 export const loadName = () => safeGet(() => localStorage, NAME_KEY) ?? ''
 export const saveName = (name: string) => safeSet(() => localStorage, NAME_KEY, name)
 
-/** 玩家 id 存在 sessionStorage：同一個分頁重新連線分數還在，開新分頁就是新玩家。 */
+/**
+ * 玩家 id 存在 localStorage：同一個瀏覽器開幾個分頁都算同一個人，排行榜不會重複。
+ * 換瀏覽器、無痕視窗或清掉網站資料才會變成新玩家。
+ */
 export function playerId(): string {
-  let pid = safeGet(() => sessionStorage, PID_KEY)
-  if (!pid) {
-    pid = crypto.randomUUID()
-    safeSet(() => sessionStorage, PID_KEY, pid)
-  }
+  // 舊版存在 sessionStorage，先沿用這個分頁原本的 id，正在玩的人重新整理後分數才不會不見
+  let pid = safeGet(() => localStorage, PID_KEY) ?? safeGet(() => sessionStorage, PID_KEY)
+  if (!pid) pid = crypto.randomUUID()
+  safeSet(() => localStorage, PID_KEY, pid)
   return pid
 }
 

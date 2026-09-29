@@ -262,16 +262,16 @@ export class BbqRoom extends DurableObject<Env> {
 			this.departed.add(ws);
 			this.track("player_left", { v1: new Set(others).size });
 		}
-		if (!stillOnline) {
-			// 夾著食材斷線的話放回原位，不然會永遠卡住
-			const now = Date.now();
-			for (const item of this.loadItems().filter((i) => i.heldBy === att.pid)) {
-				item.heldBy = null;
-				const food = this.food(item.foodId);
-				if (food) settle(item, food, now, this.heatScale);
-				this.saveItem(item);
-				this.broadcast({ t: "item", item, by: att.pid, action: "release" }, ws);
-			}
+		// 夾著食材斷線的話放回原位，不然會永遠卡住。
+		// 同一個瀏覽器的分頁共用 pid，分不出是哪個分頁夾的，所以只要有一條連線斷掉就全部放開，
+		// 不然關掉正在夾的分頁、另一個分頁還開著時，食材會一直卡在「被夾著」
+		const now = Date.now();
+		for (const item of this.loadItems().filter((i) => i.heldBy === att.pid)) {
+			item.heldBy = null;
+			const food = this.food(item.foodId);
+			if (food) settle(item, food, now, this.heatScale);
+			this.saveItem(item);
+			this.broadcast({ t: "item", item, by: att.pid, action: "release" }, ws);
 		}
 		this.setMeta("last_active", String(Date.now()));
 		this.broadcast({ t: "players", players: this.players(ws) }, ws);

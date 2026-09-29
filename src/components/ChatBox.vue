@@ -1,14 +1,18 @@
 <script setup lang="ts">
 import { nextTick, ref, watch } from 'vue'
+import { Captions, CaptionsOff, EyeOff } from '@lucide/vue'
 import { EMOTES } from '@shared/game'
 import { LIMITS } from '@shared/limits'
 import type { ChatLine } from '@shared/protocol'
+import type { MutedPlayer } from '@/composables/useMutedPlayers'
 
-const props = defineProps<{ lines: ChatLine[] }>()
-const emit = defineEmits<{ say: [text: string]; emote: [e: string] }>()
+const props = defineProps<{ lines: ChatLine[]; you: string; muted: MutedPlayer[] }>()
+const danmaku = defineModel<boolean>('danmaku', { required: true })
+const emit = defineEmits<{ say: [text: string]; emote: [e: string]; mute: [pid: string, name: string]; unmute: [pid: string] }>()
 
 const text = ref('')
 const list = ref<HTMLOListElement | null>(null)
+const showMuted = ref(false)
 
 watch(
   () => props.lines.length,
@@ -17,6 +21,13 @@ watch(
     list.value?.scrollTo({ top: list.value.scrollHeight })
   },
   { immediate: true },
+)
+
+watch(
+  () => props.muted.length,
+  (n) => {
+    if (n === 0) showMuted.value = false
+  },
 )
 
 function submit() {
@@ -31,6 +42,21 @@ const time = (ts: number) => new Date(ts).toLocaleTimeString('zh-TW', { hour: '2
 
 <template>
   <section class="chat card" aria-label="聊天">
+    <header class="head">
+      <h2>聊天</h2>
+      <button
+        type="button"
+        class="btn btn-sm toggle"
+        :class="{ on: danmaku }"
+        :aria-pressed="danmaku"
+        :title="danmaku ? '關閉彈幕' : '開啟彈幕'"
+        @click="danmaku = !danmaku"
+      >
+        <Captions v-if="danmaku" :size="16" />
+        <CaptionsOff v-else :size="16" />
+        彈幕
+      </button>
+    </header>
     <div class="emotes">
       <button v-for="e in EMOTES" :key="e" class="emote" :aria-label="`送出 ${e}`" @click="emit('emote', e)">{{ e }}</button>
     </div>
@@ -40,8 +66,29 @@ const time = (ts: number) => new Date(ts).toLocaleTimeString('zh-TW', { hour: '2
         <span class="who" :style="{ color: l.color }">{{ l.name }}</span>
         <span class="text">{{ l.text }}</span>
         <time>{{ time(l.ts) }}</time>
+        <button
+          v-if="l.pid !== you"
+          type="button"
+          class="mute"
+          :aria-label="`隱藏 ${l.name} 的訊息`"
+          :title="`隱藏 ${l.name} 的訊息`"
+          @click="emit('mute', l.pid, l.name)"
+        >
+          <EyeOff :size="14" />
+        </button>
       </li>
     </ol>
+    <div v-if="muted.length" class="muted-bar">
+      <button type="button" class="link" :aria-expanded="showMuted" @click="showMuted = !showMuted">
+        已隱藏 {{ muted.length }} 人
+      </button>
+      <ul v-if="showMuted" class="muted-list">
+        <li v-for="m in muted" :key="m.pid">
+          <span class="muted-name">{{ m.name }}</span>
+          <button type="button" class="link" @click="emit('unmute', m.pid)">取消隱藏</button>
+        </li>
+      </ul>
+    </div>
     <form class="say" @submit.prevent="submit">
       <input v-model="text" class="input" :maxlength="LIMITS.chatMax" placeholder="說點什麼…" aria-label="聊天訊息" />
       <button class="btn btn-sm" type="submit" :disabled="!text.trim()">送出</button>
@@ -55,6 +102,31 @@ const time = (ts: number) => new Date(ts).toLocaleTimeString('zh-TW', { hour: '2
   flex-direction: column;
   padding: 12px;
   min-height: 0;
+}
+
+.head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+}
+
+h2 {
+  margin: 0;
+  font-size: 1rem;
+}
+
+.toggle {
+  gap: 5px;
+  min-height: 30px;
+  padding: 0 0.7em;
+  color: var(--muted);
+}
+
+.toggle.on {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+  color: var(--gold);
 }
 
 .emotes {
@@ -92,8 +164,14 @@ const time = (ts: number) => new Date(ts).toLocaleTimeString('zh-TW', { hour: '2
 }
 
 .lines li {
-  padding: 2px 0;
+  position: relative;
+  padding: 2px 28px 2px 0;
+  border-radius: 6px;
   overflow-wrap: anywhere;
+}
+
+.lines li:hover {
+  background: rgb(255 255 255 / 0.03);
 }
 
 .who {
@@ -107,8 +185,80 @@ time {
   font-size: 0.75rem;
 }
 
+/* 只在滑過或用鍵盤選到時出現，平常不佔視線 */
+.mute {
+  position: absolute;
+  top: 2px;
+  right: 2px;
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  border: 0;
+  border-radius: 6px;
+  background: var(--surface-3);
+  color: var(--muted);
+  opacity: 0;
+}
+
+.lines li:hover .mute,
+.mute:focus-visible {
+  opacity: 1;
+}
+
+.mute:hover {
+  color: var(--text);
+}
+
+/* 觸控裝置沒有 hover，一直顯示 */
+@media (hover: none) {
+  .mute {
+    opacity: 0.7;
+  }
+}
+
 .empty {
   color: var(--faint);
+}
+
+.muted-bar {
+  margin-top: 6px;
+  font-size: 0.8rem;
+}
+
+.link {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--muted);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.link:hover {
+  color: var(--text);
+}
+
+.muted-list {
+  margin: 6px 0 0;
+  padding: 6px 8px;
+  border-radius: var(--radius-sm);
+  background: var(--surface-2);
+  list-style: none;
+}
+
+.muted-list li {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 2px 0;
+}
+
+.muted-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .say {
