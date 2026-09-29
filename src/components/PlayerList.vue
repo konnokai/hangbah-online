@@ -4,25 +4,13 @@ import { ChevronDown, ChevronUp } from '@lucide/vue'
 import type { PlayerInfo } from '@shared/protocol'
 import { loadJSON, saveJSON } from '@/utils/storage'
 
-const props = withDefaults(
-  defineProps<{ players: PlayerInfo[]; you: string; variant?: 'card' | 'overlay' }>(),
-  { variant: 'card' },
-)
+const props = defineProps<{ players: PlayerInfo[]; you: string }>()
 
 const sorted = computed(() =>
   [...props.players].sort((a, b) => b.score - a.score || Number(b.online) - Number(a.online)),
 )
 const onlineCount = computed(() => props.players.filter((p) => p.online).length)
 const rankOf = (i: number, p: PlayerInfo) => (i === 0 && p.score > 0 ? '🏆' : String(i + 1))
-
-// 疊在烤架上時不能捲動（整塊不吃滑鼠事件），所以只列前幾名，自己排在後面就另外補一列
-const OVERLAY_TOP = 5
-const overlayRows = computed(() => {
-  const rows = sorted.value.slice(0, OVERLAY_TOP).map((p, i) => ({ p, rank: rankOf(i, p) }))
-  const mine = sorted.value.findIndex((p) => p.pid === props.you)
-  if (mine >= OVERLAY_TOP) rows.push({ p: sorted.value[mine]!, rank: String(mine + 1) })
-  return rows
-})
 const leader = computed(() => sorted.value[0] ?? null)
 
 const COLLAPSE_KEY = 'hangbah:leaderboard'
@@ -31,21 +19,7 @@ watch(collapsed, (v) => saveJSON(COLLAPSE_KEY, { collapsed: v }))
 </script>
 
 <template>
-  <section v-if="variant === 'card'" class="players card" aria-label="排行榜">
-    <h2>
-      排行榜 <span class="count">{{ onlineCount }} 人在線</span>
-    </h2>
-    <ol>
-      <li v-for="(p, i) in sorted" :key="p.pid" :class="{ offline: !p.online, me: p.pid === you }">
-        <span class="rank">{{ rankOf(i, p) }}</span>
-        <span class="dot" :style="{ background: p.color }" />
-        <span class="name">{{ p.name }}<small v-if="p.pid === you">（你）</small></span>
-        <span class="score">{{ p.score }}</span>
-      </li>
-    </ol>
-  </section>
-
-  <section v-else class="overlay" :class="{ collapsed }" aria-label="排行榜">
+  <section class="overlay" :class="{ collapsed }" aria-label="排行榜">
     <header class="ov-head">
       <span class="ov-title">
         <template v-if="collapsed && leader && leader.score > 0">🏆 {{ leader.name }} {{ leader.score }}</template>
@@ -64,45 +38,22 @@ watch(collapsed, (v) => saveJSON(COLLAPSE_KEY, { collapsed: v }))
         <ChevronUp v-else :size="14" />
       </button>
     </header>
-    <ol v-if="!collapsed">
-      <li v-for="r in overlayRows" :key="r.p.pid" :class="{ offline: !r.p.online, me: r.p.pid === you }">
-        <span class="rank">{{ r.rank }}</span>
-        <span class="dot" :style="{ background: r.p.color }" />
-        <span class="name">{{ r.p.name }}</span>
-        <span class="score">{{ r.p.score }}</span>
+    <ol v-if="!collapsed" tabindex="0" aria-label="玩家分數">
+      <li v-for="(p, i) in sorted" :key="p.pid" :class="{ offline: !p.online, me: p.pid === you }">
+        <span class="rank">{{ rankOf(i, p) }}</span>
+        <span class="dot" :style="{ background: p.color }" />
+        <span class="name">{{ p.name }}</span>
+        <span class="score">{{ p.score }}</span>
       </li>
     </ol>
   </section>
 </template>
 
 <style scoped>
-.players {
-  padding: 14px;
-}
-
-h2 {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  margin: 0 0 8px;
-  font-size: 1rem;
-}
-
-.count {
-  color: var(--muted);
-  font-size: 0.8rem;
-  font-weight: 400;
-}
-
 ol {
   margin: 0;
   padding: 0;
   list-style: none;
-}
-
-.players ol {
-  max-height: 220px;
-  overflow: auto;
 }
 
 li {
@@ -140,18 +91,14 @@ li.offline {
   white-space: nowrap;
 }
 
-.name small {
-  color: var(--muted);
-}
-
 .score {
   font-variant-numeric: tabular-nums;
   font-weight: 700;
   color: var(--gold);
 }
 
-/* ---------- 疊在烤架上的版本 ---------- */
-/* 整塊不吃滑鼠事件，底下的食材照樣可以拖；只有收合按鈕可以點 */
+/* ---------- 疊在烤架左上角 ---------- */
+/* 標題列不吃滑鼠事件，底下的食材照樣可以拖；只有收合按鈕和名單（要捲動）可以操作 */
 .overlay {
   position: absolute;
   top: 10px;
@@ -216,7 +163,14 @@ li.offline {
 }
 
 .overlay ol {
+  /* 大約五列半，露出半列讓人知道下面還有 */
+  max-height: 9.6em;
   margin-top: 4px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+  scrollbar-color: rgb(255 255 255 / 0.25) transparent;
+  pointer-events: auto;
 }
 
 .overlay li {
@@ -226,7 +180,11 @@ li.offline {
 }
 
 .overlay li.me {
-  background: rgb(255 122 47 / 0.22);
+  /* 自己那列捲出去時貼在上緣或下緣，永遠看得到自己的名次。底色要不透明，才不會跟別列疊在一起 */
+  position: sticky;
+  top: 0;
+  bottom: 0;
+  background: #4b2d1d;
 }
 
 .overlay .rank {
@@ -237,5 +195,24 @@ li.offline {
 .overlay .dot {
   width: 8px;
   height: 8px;
+}
+
+/* 手機烤架小，排行榜縮小一點，少擋一點烤架 */
+@media (max-width: 960px) {
+  .overlay {
+    top: 6px;
+    left: 6px;
+    width: 168px;
+    padding: 4px 4px 4px 8px;
+    font-size: 0.72rem;
+  }
+
+  .overlay.collapsed {
+    max-width: 200px;
+  }
+
+  .overlay ol {
+    max-height: 6.4em;
+  }
 }
 </style>

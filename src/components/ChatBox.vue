@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { nextTick, ref, watch } from 'vue'
-import { Captions, CaptionsOff, EyeOff } from '@lucide/vue'
+import { Captions, CaptionsOff, EyeOff, X } from '@lucide/vue'
 import { EMOTES } from '@shared/game'
 import { LIMITS } from '@shared/limits'
 import type { ChatLine } from '@shared/protocol'
@@ -8,10 +8,11 @@ import type { MutedPlayer } from '@/composables/useMutedPlayers'
 
 const props = defineProps<{ lines: ChatLine[]; you: string; muted: MutedPlayer[] }>()
 const danmaku = defineModel<boolean>('danmaku', { required: true })
-const emit = defineEmits<{ say: [text: string]; emote: [e: string]; mute: [pid: string, name: string]; unmute: [pid: string] }>()
+const emit = defineEmits<{ say: [text: string]; emote: [e: string]; mute: [pid: string, name: string]; unmute: [pid: string]; close: [] }>()
 
 const text = ref('')
 const list = ref<HTMLOListElement | null>(null)
+const input = ref<HTMLInputElement | null>(null)
 const showMuted = ref(false)
 
 watch(
@@ -37,6 +38,14 @@ function submit() {
   text.value = ''
 }
 
+// 聊天室收起來時是 display: none，捲動沒有作用，所以打開時要再捲一次到最新
+function reveal() {
+  list.value?.scrollTo({ top: list.value.scrollHeight })
+  // 觸控裝置一聚焦就會跳出鍵盤，把訊息擋掉，所以只在有滑鼠時自動聚焦
+  if (matchMedia('(pointer: fine)').matches) input.value?.focus()
+}
+defineExpose({ reveal })
+
 const time = (ts: number) => new Date(ts).toLocaleTimeString('zh-TW', { hour: '2-digit', minute: '2-digit' })
 </script>
 
@@ -55,6 +64,9 @@ const time = (ts: number) => new Date(ts).toLocaleTimeString('zh-TW', { hour: '2
         <Captions v-if="danmaku" :size="16" />
         <CaptionsOff v-else :size="16" />
         彈幕
+      </button>
+      <button type="button" class="btn btn-sm close" aria-label="收起聊天室" title="收起聊天室" @click="emit('close')">
+        <X :size="18" />
       </button>
     </header>
     <div class="emotes">
@@ -90,7 +102,7 @@ const time = (ts: number) => new Date(ts).toLocaleTimeString('zh-TW', { hour: '2
       </ul>
     </div>
     <form class="say" @submit.prevent="submit">
-      <input v-model="text" class="input" :maxlength="LIMITS.chatMax" placeholder="說點什麼…" aria-label="聊天訊息" />
+      <input ref="input" v-model="text" class="input" :maxlength="LIMITS.chatMax" placeholder="說點什麼…" aria-label="聊天訊息" />
       <button class="btn btn-sm" type="submit" :disabled="!text.trim()">送出</button>
     </form>
   </section>
@@ -112,8 +124,21 @@ const time = (ts: number) => new Date(ts).toLocaleTimeString('zh-TW', { hour: '2
 }
 
 h2 {
+  flex: 1;
   margin: 0;
   font-size: 1rem;
+}
+
+.close {
+  width: 30px;
+  min-height: 30px;
+  margin-left: 6px;
+  padding: 0;
+  color: var(--muted);
+}
+
+.close:hover {
+  color: var(--text);
 }
 
 .toggle {

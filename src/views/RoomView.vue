@@ -1,7 +1,7 @@
 <script setup lang="ts">
-import { computed, effectScope, onBeforeUnmount, onMounted, reactive, ref, shallowRef, watch } from 'vue'
+import { computed, effectScope, nextTick, onBeforeUnmount, onMounted, reactive, ref, shallowRef, watch } from 'vue'
 import { RouterLink, onBeforeRouteLeave, useRoute, useRouter } from 'vue-router'
-import { Link } from '@lucide/vue'
+import { Link, MessageCircle } from '@lucide/vue'
 import { BUILTIN_FOODS, customFoodUrl } from '@shared/game'
 import { ROOM_CODE_RE } from '@shared/limits'
 import { useRoom, type Room } from '@/composables/useRoom'
@@ -41,6 +41,31 @@ const DANMAKU_KEY = 'hangbah:danmaku'
 const danmakuOn = ref(loadJSON(DANMAKU_KEY, { on: true }).on !== false)
 watch(danmakuOn, (on) => saveJSON(DANMAKU_KEY, { on }))
 const visibleChat = computed(() => room.value?.state.chat.filter((l) => !muted.isMuted(l.pid)) ?? [])
+
+// ---------- 聊天室收合 ----------
+// 電腦版收成左下角的圓鈕，手機版收成標題列的按鈕。平常收起來，彈幕照樣會飄。
+const chatOpen = ref(false)
+const unread = ref(0)
+const chatBox = ref<InstanceType<typeof ChatBox> | null>(null)
+const chatFab = ref<HTMLButtonElement | null>(null)
+const chatBtn = ref<HTMLButtonElement | null>(null)
+const unreadLabel = computed(() => (unread.value > 99 ? '99+' : String(unread.value)))
+
+watch(chatOpen, async (open) => {
+  if (!open) return
+  unread.value = 0
+  await nextTick()
+  chatBox.value?.reveal()
+})
+
+async function closeChat() {
+  chatOpen.value = false
+  // 焦點還給看得到的那顆按鈕，鍵盤使用者才不會迷路
+  await nextTick()
+  // 左下角圓鈕是 position: fixed，offsetParent 永遠是 null，只能看有沒有畫出框
+  const target = [chatFab.value, chatBtn.value].find((b) => b && b.getClientRects().length > 0)
+  target?.focus()
+}
 
 // ---------- 提示訊息 ----------
 const toasts = reactive<{ key: number; text: string }[]>([])
@@ -88,6 +113,7 @@ function join(name: string) {
     } else if (ev.type === 'chat') {
       if (muted.isMuted(ev.line.pid)) return
       if (!ev.mine) sfx.play('chat')
+      if (!ev.mine && !chatOpen.value) unread.value++
       // 只有連線後收到的新訊息會飄，進房時載入的歷史不飄
       danmaku.value?.push({ name: ev.line.name, text: ev.line.text, color: ev.line.color })
     } else if (ev.type === 'error' && ev.code !== 'room_full') {
@@ -223,6 +249,19 @@ const ghostWidth = computed(() => {
           <span class="code">房號 <code>{{ code }}</code></span>
         </div>
         <div class="actions">
+          <button
+            ref="chatBtn"
+            type="button"
+            class="btn btn-sm chat-btn"
+            :aria-label="unread ? `開啟聊天室，${unread} 則未讀` : '開啟聊天室'"
+            :aria-expanded="chatOpen"
+            aria-controls="chat-dock"
+            title="聊天室"
+            @click="chatOpen = !chatOpen"
+          >
+            <MessageCircle :size="18" />
+            <span v-if="unread" class="unread" aria-hidden="true">{{ unreadLabel }}</span>
+          </button>
           <SoundControl />
           <button class="btn btn-sm btn-primary" @click="share"><Link :size="16" />邀請朋友</button>
         </div>
@@ -238,7 +277,7 @@ const ghostWidth = computed(() => {
         <div class="stage">
           <div class="board">
             <Grill ref="grill" :room="room" :code="code" :tool="tool" :muted-pids="muted.pids.value" />
-            <PlayerList class="desktop-only" variant="overlay" :players="room.state.players" :you="room.state.you.pid" />
+            <PlayerList :players="room.state.players" :you="room.state.you.pid" />
             <Danmaku ref="danmaku" :enabled="danmakuOn" />
           </div>
           <p class="legend" aria-hidden="true">
@@ -251,13 +290,35 @@ const ghostWidth = computed(() => {
         <aside class="side">
           <FoodTray
             v-model:tool="tool"
+            class="tray-panel"
             :code="code"
             :custom-foods="room.state.customFoods"
             @press="onTrayPress"
             @upload="showUpload = true"
           />
-          <PlayerList class="mobile-only" :players="room.state.players" :you="room.state.you.pid" />
+        </aside>
+      </div>
+
+      <button
+        v-show="!chatOpen"
+        ref="chatFab"
+        type="button"
+        class="chat-fab"
+        :aria-label="unread ? `開啟聊天室，${unread} 則未讀` : '開啟聊天室'"
+        :aria-expanded="chatOpen"
+        aria-controls="chat-dock"
+        title="聊天室"
+        @click="chatOpen = true"
+      >
+        <MessageCircle :size="24" />
+        <span v-if="unread" class="unread" aria-hidden="true">{{ unreadLabel }}</span>
+      </button>
+
+      <!-- 用 v-show 不用 v-if：收起來再打開時，打到一半的字和捲動位置都還在 -->
+      <Transition name="chat-pop">
+        <div v-show="chatOpen" id="chat-dock" class="chat-dock" @click.self="closeChat" @keydown.esc="closeChat">
           <ChatBox
+            ref="chatBox"
             v-model:danmaku="danmakuOn"
             class="chat-panel"
             :lines="visibleChat"
@@ -267,9 +328,10 @@ const ghostWidth = computed(() => {
             @emote="(e) => room?.send({ t: 'emote', e })"
             @mute="(pid, name) => muted.mute(pid, name)"
             @unmute="(pid) => muted.unmute(pid)"
+            @close="closeChat"
           />
-        </aside>
-      </div>
+        </div>
+      </Transition>
 
       <UploadFoodDialog v-if="showUpload" :code="code" :token="room.state.uploadToken" @close="showUpload = false" />
     </template>
@@ -397,7 +459,6 @@ code {
   display: grid;
   grid-template-columns: minmax(0, 1fr) 340px;
   gap: 16px;
-  align-items: start;
 }
 
 /* 排行榜和彈幕疊在烤架上，所以烤架外面要多包一層定位用的容器 */
@@ -406,30 +467,98 @@ code {
 }
 
 /*
- * 電腦版右欄：固定在畫面上，高度跟著視窗，聊天室吃掉食材盤以外的所有空間。
- * 排行榜移到烤架左上角，右欄就不放了。
+ * 電腦版右欄只剩食材盤，高度跟左邊烤架那欄一樣，食材多了就在盤子裡捲動。
+ * contain: size 讓右欄不撐高這一列，列高只由烤架決定，再用 stretch 拉到同高。
+ * 排行榜在烤架左上角，聊天室收在畫面左下角。
  */
 .side {
-  position: sticky;
-  top: 12px;
   display: flex;
   flex-direction: column;
   gap: 12px;
-  max-height: calc(100dvh - 24px);
-  min-height: 520px;
+  min-height: 420px;
+  contain: size;
+}
+
+.tray-panel {
+  flex: 1;
+}
+
+/* 聊天室浮在畫面上，不佔版面，打開時會蓋住烤架左下角 */
+.chat-fab {
+  position: fixed;
+  left: 16px;
+  bottom: 16px;
+  z-index: 150;
+  display: grid;
+  place-items: center;
+  width: 52px;
+  height: 52px;
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: 50%;
+  background: var(--surface-3);
+  box-shadow: var(--shadow-md);
+  transition: border-color 0.15s, color 0.15s;
+}
+
+.chat-fab:hover {
+  border-color: var(--accent);
+  color: var(--gold);
+}
+
+.chat-btn {
+  position: relative;
+  display: none;
+  width: 36px;
+  padding: 0;
+}
+
+.unread {
+  position: absolute;
+  top: -5px;
+  right: -5px;
+  min-width: 20px;
+  height: 20px;
+  padding: 0 5px;
+  border-radius: 999px;
+  background: var(--accent);
+  color: #1c0d04;
+  font-size: 0.72rem;
+  font-weight: 700;
+  line-height: 20px;
+  text-align: center;
+}
+
+.chat-dock {
+  position: fixed;
+  left: 16px;
+  bottom: 16px;
+  z-index: 150;
+  display: flex;
+  width: 340px;
+  height: min(480px, calc(100dvh - 32px));
 }
 
 .chat-panel {
   flex: 1;
-  min-height: 280px;
+  min-width: 0;
+  box-shadow: var(--shadow-lg);
 }
 
 .chat-panel :deep(.lines) {
   max-height: none;
 }
 
-.mobile-only {
-  display: none;
+.chat-pop-enter-active,
+.chat-pop-leave-active {
+  transform-origin: left bottom;
+  transition: opacity 0.15s ease-out, transform 0.15s ease-out;
+}
+
+.chat-pop-enter-from,
+.chat-pop-leave-to {
+  opacity: 0;
+  transform: translateY(8px) scale(0.97);
 }
 
 .legend {
@@ -510,25 +639,33 @@ code {
     grid-template-columns: 1fr;
   }
 
-  /* 手機、平板烤架太小，排行榜不疊上去，回到卡片 */
   .side {
-    position: static;
     display: grid;
     grid-template-columns: 1fr;
-    max-height: none;
     min-height: 0;
+    contain: none;
   }
 
-  .chat-panel :deep(.lines) {
-    max-height: 240px;
-  }
-
-  .desktop-only {
+  /* 手機、平板：按鈕移到標題列，聊天室打開時蓋滿整個畫面 */
+  .chat-fab {
     display: none;
   }
 
-  .mobile-only {
-    display: block;
+  .chat-btn {
+    display: inline-flex;
+  }
+
+  .chat-dock {
+    inset: 0;
+    width: auto;
+    height: auto;
+    padding: 10px;
+    background: rgb(0 0 0 / 0.55);
+  }
+
+  .chat-pop-enter-from,
+  .chat-pop-leave-to {
+    transform: none;
   }
 }
 

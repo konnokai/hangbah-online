@@ -71,9 +71,11 @@ client 端（`Grill.vue`）算到燒毀門檻就先播動畫，並把 id 放進 
 - `src/components/Grill.vue`：桌面座標 0–1（比例固定 16:10，烤架範圍是 `shared/game.ts` 的 `GRILL`）、拖曳、點一下翻面、點兩下吃、門檻音效。
 - `src/foods/*.vue`：內建食材是手寫 SVG，顏色用 `cookColor(palette, d)` 依熟度內插。`FOOD_ASPECT` 必須跟各元件的 viewBox 一致；顯示寬度在 `BUILTIN_FOODS.width`。
 - `src/audio/sfx.ts`：Web Audio 即時合成，沒有音檔。`AudioContext` 要在使用者操作時 `sfx.unlock()`。
-- 烤架外面包了 `.board`，上面疊兩層，都是 `pointer-events: none`，不能擋到拖曳：
-  - 電腦版（> 960px）的排行榜：`PlayerList variant="overlay"`，只列前 5 名加上自己，只有收合按鈕能點。手機版改回右欄卡片。
+- 烤架外面包了 `.board`，上面疊兩層，基本上是 `pointer-events: none`，盡量不擋到拖曳：
+  - 排行榜：`PlayerList`，電腦版、手機版都疊在烤架左上角，手機版縮小。名單可以捲動，所以名單那塊會吃滑鼠事件（標題列不會）。自己那列用 `position: sticky` 貼在上下緣。
   - 聊天彈幕：`Danmaku.vue`，RoomView 收到 `chat` 事件時呼叫 `push()`。每則固定飄 7 秒，軌道用字寬和時間計算。
+- 聊天室（`ChatBox`）平常收起來，只剩按鈕，未讀數顯示在按鈕上。電腦版按鈕在畫面左下角，打開後浮在烤架上；手機版（≤ 960px）按鈕在標題列音效按鈕左邊，打開後蓋滿畫面。用 `v-show`，收起來時打到一半的字還在。
+- 電腦版右欄只放食材盤：`.side` 用 `contain: size`，高度跟烤架那欄一樣。食材太多時在盤子裡捲動，捲軸隱藏，改用往下箭頭提示。手機版不限高度，因為食材按鈕是 `touch-action: none`（要拖曳），在上面滑不能捲動。
 - 隱藏玩家：`useMutedPlayers`，存在 `localStorage` 的 `hangbah:muted:<房號>`，只在本機生效。會過濾聊天、彈幕、表情，不影響食材和游標。
 - 翻面動畫在 `FoodItem.vue`：`side` 一變就播。先凍結舊的兩面熟度，轉到側面（一半時間）才換色。
 - 減少動態效果（`prefers-reduced-motion`）時，彈幕和翻面動畫都關掉。

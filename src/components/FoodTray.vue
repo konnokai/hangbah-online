@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import { computed } from 'vue'
-import { Plus } from '@lucide/vue'
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { ChevronDown, Plus } from '@lucide/vue'
 import { BUILTIN_FOODS, customFoodId, customFoodUrl, type CustomFood } from '@shared/game'
 import { FOOD_ART } from '@/foods'
 import type { Tool } from './Grill.vue'
@@ -11,6 +11,34 @@ const emit = defineEmits<{ press: [foodId: string, e: PointerEvent]; upload: [] 
 
 const customs = computed(() =>
   props.customFoods.map((c) => ({ id: customFoodId(c.id), name: c.name, url: customFoodUrl(props.code, c) })),
+)
+
+// ---------- 食材太多時的往下提示 ----------
+// 捲軸藏起來了，要靠箭頭告訴使用者下面還有東西
+const grid = ref<HTMLDivElement | null>(null)
+const more = ref(false)
+
+function check() {
+  const g = grid.value
+  if (!g) return
+  more.value = g.scrollTop + g.clientHeight < g.scrollHeight - 4
+}
+
+function scrollMore() {
+  const g = grid.value
+  g?.scrollBy({ top: g.clientHeight * 0.7, behavior: 'smooth' })
+}
+
+let ro: ResizeObserver | undefined
+onMounted(() => {
+  ro = new ResizeObserver(check)
+  if (grid.value) ro.observe(grid.value)
+  check()
+})
+onBeforeUnmount(() => ro?.disconnect())
+watch(
+  () => props.customFoods.length,
+  () => nextTick(check),
 )
 </script>
 
@@ -44,30 +72,35 @@ const customs = computed(() =>
       <template v-if="tool === 'tongs'">夾子：拖曳移動、點一下翻面、點兩下吃掉。</template>
       <template v-else>刷醬：點一下食材刷上烤肉醬，烤得剛好再吃分數更高。</template>
     </p>
-    <div class="grid">
-      <button
-        v-for="f in BUILTIN_FOODS"
-        :key="f.id"
-        class="food-btn"
-        :title="f.name"
-        @pointerdown.prevent="emit('press', f.id, $event)"
-      >
-        <span class="art"><component :is="FOOD_ART[f.id]" :d="0" :sauced="false" /></span>
-        <span class="name">{{ f.name }}</span>
-      </button>
-      <button
-        v-for="c in customs"
-        :key="c.id"
-        class="food-btn"
-        :title="c.name"
-        @pointerdown.prevent="emit('press', c.id, $event)"
-      >
-        <span class="art"><img :src="c.url" alt="" draggable="false" /></span>
-        <span class="name">{{ c.name }}</span>
-      </button>
-      <button class="food-btn add" title="上傳圖片做成食材" @click="emit('upload')">
-        <span class="art plus"><Plus :size="26" /></span>
-        <span class="name">自訂食材</span>
+    <div class="grid-wrap" :class="{ more }">
+      <div ref="grid" class="grid" @scroll.passive="check">
+        <button
+          v-for="f in BUILTIN_FOODS"
+          :key="f.id"
+          class="food-btn"
+          :title="f.name"
+          @pointerdown.prevent="emit('press', f.id, $event)"
+        >
+          <span class="art"><component :is="FOOD_ART[f.id]" :d="0" :sauced="false" /></span>
+          <span class="name">{{ f.name }}</span>
+        </button>
+        <button
+          v-for="c in customs"
+          :key="c.id"
+          class="food-btn"
+          :title="c.name"
+          @pointerdown.prevent="emit('press', c.id, $event)"
+        >
+          <span class="art"><img :src="c.url" alt="" draggable="false" /></span>
+          <span class="name">{{ c.name }}</span>
+        </button>
+        <button class="food-btn add" title="上傳圖片做成食材" @click="emit('upload')">
+          <span class="art plus"><Plus :size="26" /></span>
+          <span class="name">自訂食材</span>
+        </button>
+      </div>
+      <button v-show="more" type="button" class="more-btn" aria-label="往下看更多食材" title="往下看更多食材" @click="scrollMore">
+        <ChevronDown :size="20" />
       </button>
     </div>
   </section>
@@ -75,6 +108,9 @@ const customs = computed(() =>
 
 <style scoped>
 .tray {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
   padding: 14px;
 }
 
@@ -113,10 +149,78 @@ h2 {
   color: var(--text);
 }
 
+/* 外層決定高度時（電腦版），食材格在裡面捲動；沒限制高度時（手機版）就全部攤開 */
+.grid-wrap {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+}
+
 .grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(76px, 1fr));
+  align-content: start;
   gap: 8px;
+  flex: 1;
+  min-height: 0;
+  /* 留一點邊，按鈕的焦點外框才不會被捲動區切掉 */
+  margin: -3px;
+  padding: 3px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: none;
+}
+
+.grid::-webkit-scrollbar {
+  display: none;
+}
+
+.grid-wrap::after {
+  content: '';
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  height: 56px;
+  background: linear-gradient(to bottom, transparent, var(--surface));
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.15s;
+}
+
+.grid-wrap.more::after {
+  opacity: 1;
+}
+
+.more-btn {
+  position: absolute;
+  bottom: 6px;
+  left: 50%;
+  z-index: 1;
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: 50%;
+  background: var(--surface-3);
+  color: var(--gold);
+  box-shadow: var(--shadow-sm);
+  transform: translateX(-50%);
+  animation: nudge 1.6s ease-in-out infinite;
+}
+
+.more-btn:hover {
+  border-color: var(--accent);
+}
+
+@keyframes nudge {
+  50% {
+    transform: translate(-50%, 3px);
+  }
 }
 
 .food-btn {
