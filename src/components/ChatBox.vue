@@ -1,0 +1,123 @@
+<script setup lang="ts">
+import { nextTick, ref, watch } from 'vue'
+import { EMOTES } from '@shared/game'
+import { LIMITS } from '@shared/limits'
+import type { ChatLine } from '@shared/protocol'
+
+const props = defineProps<{ lines: ChatLine[] }>()
+const emit = defineEmits<{ say: [text: string]; emote: [e: string] }>()
+
+const text = ref('')
+const list = ref<HTMLOListElement | null>(null)
+
+watch(
+  () => props.lines.length,
+  async () => {
+    await nextTick()
+    list.value?.scrollTo({ top: list.value.scrollHeight })
+  },
+  { immediate: true },
+)
+
+function submit() {
+  const t = text.value.trim()
+  if (!t) return
+  emit('say', t)
+  text.value = ''
+}
+
+const time = (ts: number) => new Date(ts).toLocaleTimeString('zh-TW', { hour: '2-digit', minute: '2-digit' })
+</script>
+
+<template>
+  <section class="chat card" aria-label="聊天">
+    <div class="emotes">
+      <button v-for="e in EMOTES" :key="e" class="emote" :aria-label="`送出 ${e}`" @click="emit('emote', e)">{{ e }}</button>
+    </div>
+    <ol ref="list" class="lines" aria-live="polite">
+      <li v-if="!lines.length" class="empty">還沒有人說話。來打聲招呼吧！</li>
+      <li v-for="(l, i) in lines" :key="`${l.ts}-${i}`">
+        <span class="who" :style="{ color: l.color }">{{ l.name }}</span>
+        <span class="text">{{ l.text }}</span>
+        <time>{{ time(l.ts) }}</time>
+      </li>
+    </ol>
+    <form class="say" @submit.prevent="submit">
+      <input v-model="text" class="input" :maxlength="LIMITS.chatMax" placeholder="說點什麼…" aria-label="聊天訊息" />
+      <button class="btn btn-sm" type="submit" :disabled="!text.trim()">送出</button>
+    </form>
+  </section>
+</template>
+
+<style scoped>
+.chat {
+  display: flex;
+  flex-direction: column;
+  padding: 12px;
+  min-height: 0;
+}
+
+.emotes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-bottom: 8px;
+}
+
+.emote {
+  width: 34px;
+  height: 34px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--surface-2);
+  font-size: 18px;
+  line-height: 1;
+  transition: transform 0.1s;
+}
+
+.emote:hover {
+  transform: scale(1.12);
+  border-color: var(--accent);
+}
+
+.lines {
+  flex: 1;
+  min-height: 120px;
+  max-height: 240px;
+  margin: 0;
+  padding: 4px 2px;
+  overflow: auto;
+  list-style: none;
+  font-size: 0.9rem;
+}
+
+.lines li {
+  padding: 2px 0;
+  overflow-wrap: anywhere;
+}
+
+.who {
+  margin-right: 6px;
+  font-weight: 700;
+}
+
+time {
+  margin-left: 6px;
+  color: var(--faint);
+  font-size: 0.75rem;
+}
+
+.empty {
+  color: var(--faint);
+}
+
+.say {
+  display: flex;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.say .input {
+  min-height: 36px;
+}
+</style>

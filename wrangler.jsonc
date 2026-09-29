@@ -1,0 +1,28 @@
+/**
+ * Wrangler 設定：https://developers.cloudflare.com/workers/wrangler/configuration/
+ */
+{
+	"$schema": "node_modules/wrangler/config-schema.json",
+	"name": "hangbah-online",
+	"compatibility_date": "2026-09-26",
+	"main": "server/index.ts",
+	"assets": {
+		"binding": "ASSETS",
+		"not_found_handling": "single-page-application",
+		// /r/* 要在 server 端改寫 <head> 放預覽卡片，Discord 只讀 server 輸出的 HTML
+		"run_worker_first": ["/api/*", "/ws/*", "/r/*"]
+	},
+	"durable_objects": {
+		"bindings": [{ "name": "ROOMS", "class_name": "BbqRoom" }]
+	},
+	"migrations": [{ "tag": "v1", "new_sqlite_classes": ["BbqRoom"] }],
+	"r2_buckets": [{ "binding": "IMAGES", "bucket_name": "hangbah-online-images" }],
+	"vars": {
+		// 火力倍率。本機測試可在 .dev.vars 調大，不用等好幾分鐘
+		"HEAT_SCALE": "1"
+	},
+	"observability": {
+		"enabled": true
+	},
+	"upload_source_maps": true
+}
