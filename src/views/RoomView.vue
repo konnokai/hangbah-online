@@ -34,6 +34,12 @@ const showUpload = ref(false)
 
 const title = computed(() => (host.value ? `${host.value}的烤肉場` : '烤肉場'))
 
+const latency = computed(() => room.value?.state.latency ?? null)
+const latencyLevel = computed(() => {
+  const ms = latency.value ?? 0
+  return ms < 100 ? 'good' : ms < 250 ? 'fair' : 'poor'
+})
+
 // ---------- 聊天：隱藏名單、彈幕 ----------
 const muted = useMutedPlayers(code)
 const danmaku = ref<InstanceType<typeof Danmaku> | null>(null)
@@ -265,7 +271,12 @@ const ghostWidth = computed(() => {
         </RouterLink>
         <div class="title">
           <h1>{{ title }}</h1>
-          <span class="code">房號 <code>{{ code }}</code></span>
+          <div class="meta">
+            <span class="code">房號 <code>{{ code }}</code></span>
+            <span v-if="latency !== null" class="latency" :class="latencyLevel" title="伺服器延遲">
+              <i class="latency-dot" aria-hidden="true" /><span class="sr-only">伺服器延遲</span>{{ latency }} ms
+            </span>
+          </div>
         </div>
         <div class="actions">
           <button
@@ -459,9 +470,42 @@ code {
   white-space: nowrap;
 }
 
+/* 窄螢幕放不下時，延遲換到下一行，靠左對齊 */
+.meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0 10px;
+}
+
 .code {
   color: var(--muted);
   font-size: 0.8rem;
+}
+
+.latency {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  color: var(--muted);
+  font-size: 0.75rem;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.latency-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--ok);
+}
+
+.latency.fair .latency-dot {
+  background: var(--gold);
+}
+
+.latency.poor .latency-dot {
+  background: var(--danger);
 }
 
 .actions {

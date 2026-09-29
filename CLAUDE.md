@@ -68,6 +68,7 @@ client 端（`Grill.vue`）算到燒毀門檻就先播動畫，並把 id 放進 
 
 **前端**
 - `src/composables/useRoom.ts`：WebSocket、自動重連、reactive 狀態、事件（`on()`）。
+  - 每 5 秒送一次文字 `ping`，同時負責保持連線和量延遲（`state.latency`，顯示在房號旁邊）。server 用 `setWebSocketAutoResponse` 自動回 `pong`，不會喚醒 DO，也不計費。
 - `src/components/Grill.vue`：桌面座標 0–1（比例固定 16:10，烤架範圍是 `shared/game.ts` 的 `GRILL`）、拖曳、點一下翻面、點兩下吃、門檻音效。
 - `src/foods/*.vue`：內建食材是手寫 SVG，顏色用 `cookColor(palette, d)` 依熟度內插。`FOOD_ASPECT` 必須跟各元件的 viewBox 一致；顯示寬度在 `BUILTIN_FOODS.width`。
 - `src/audio/sfx.ts`：Web Audio 即時合成，沒有音檔。`AudioContext` 要在使用者操作時 `sfx.unlock()`。

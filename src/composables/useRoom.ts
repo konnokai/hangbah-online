@@ -33,6 +33,8 @@ export function useRoom(code: string, name: string) {
     cursors: {} as Record<string, { x: number; y: number; ts: number }>,
     drags: {} as Record<string, { x: number; y: number }>,
     emotes: [] as FloatingEmote[],
+    /** 到 server 的來回時間（毫秒），還沒量到或斷線時是 null */
+    latency: null as number | null,
   })
 
   // server 時間 - 本機時間，熟度要用 server 的時鐘算
@@ -50,6 +52,7 @@ export function useRoom(code: string, name: string) {
   let retry = 0
   let retryTimer: ReturnType<typeof setTimeout> | null = null
   let pingTimer: ReturnType<typeof setInterval> | null = null
+  let pingSentAt: number | null = null
   let disposed = false
   let emoteKey = 0
 
@@ -59,17 +62,37 @@ export function useRoom(code: string, name: string) {
     const sock = new WebSocket(url)
     ws = sock
     sock.onmessage = (e) => {
-      if (typeof e.data === 'string' && e.data !== 'pong') handle(JSON.parse(e.data) as ServerMsg)
+      if (typeof e.data !== 'string') return
+      if (e.data === 'pong') {
+        if (pingSentAt !== null) state.latency = Math.round(performance.now() - pingSentAt)
+        pingSentAt = null
+        return
+      }
+      handle(JSON.parse(e.data) as ServerMsg)
     }
     sock.onclose = (e) => {
+      if (ws !== sock) return
       if (pingTimer) clearInterval(pingTimer)
-      if (disposed || ws !== sock) return
+      pingSentAt = null
+      state.latency = null
+      if (disposed) return
       if (e.code === 4003) {
         state.status = 'full'
         return
       }
       scheduleReconnect()
     }
+  }
+
+  // ping 同時負責兩件事：保持連線不被中間的 proxy 切斷、量延遲。
+  // server 用 setWebSocketAutoResponse 自動回 pong，不會喚醒 DO，也不計費，所以可以量得勤一點
+  const PING_MS = 5_000
+  function ping() {
+    if (ws?.readyState !== WebSocket.OPEN) return
+    // 上一個 pong 還沒回來就先不送，不然會對到錯的 pong；卡太久還是要送，當作保持連線
+    if (pingSentAt !== null && performance.now() - pingSentAt < 20_000) return
+    pingSentAt = performance.now()
+    ws.send('ping')
   }
 
   async function scheduleReconnect() {
@@ -104,8 +127,9 @@ export function useRoom(code: string, name: string) {
         state.chat = msg.chat
         state.drags = {}
         if (pingTimer) clearInterval(pingTimer)
-        // 保持連線不被中間的 proxy 切斷；server 端自動回 pong，不會喚醒 DO
-        pingTimer = setInterval(() => ws?.readyState === WebSocket.OPEN && ws.send('ping'), 25_000)
+        pingSentAt = null
+        ping()
+        pingTimer = setInterval(ping, PING_MS)
         break
       case 'players':
         state.players = msg.players
