@@ -111,7 +111,8 @@ watch(
   display: flex;
   flex-direction: column;
   min-height: 0;
-  padding: 14px;
+  /* 下緣的留白交給 .grid，捲動區和往下提示才能貼到卡片底邊 */
+  padding: 14px 14px 0;
 }
 
 .head {
@@ -166,8 +167,8 @@ h2 {
   flex: 1;
   min-height: 0;
   /* 留一點邊，按鈕的焦點外框才不會被捲動區切掉 */
-  margin: -3px;
-  padding: 3px;
+  margin: -3px -3px 0;
+  padding: 3px 3px 14px;
   overflow-y: auto;
   overscroll-behavior: contain;
   scrollbar-width: none;
@@ -196,7 +197,7 @@ h2 {
 
 .more-btn {
   position: absolute;
-  bottom: 6px;
+  bottom: 10px;
   left: 50%;
   z-index: 1;
   display: grid;
