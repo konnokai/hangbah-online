@@ -29,6 +29,16 @@
   box-sizing: border-box;
 }
 
+/*
+ * 關掉「點兩下放大」，手機上連點同一個地方才不會把整頁放大、又縮不回去。
+ * 雙指縮放保留（無障礙）。iOS 從 10 開始不理 viewport 的 user-scalable=no，只能靠這個。
+ * touch-action 不會繼承，瀏覽器只往上查到最近的捲動容器，所以每個元素都要設；
+ * 烤架、食材那些自己設了 none 的，class 選擇器比 * 優先，不受影響。
+ */
+* {
+  touch-action: manipulation;
+}
+
 html,
 body {
   margin: 0;
@@ -62,6 +72,15 @@ button,
 input {
   font: inherit;
   color: inherit;
+}
+
+/* iOS 點到字小於 16px 的輸入框會自動放大畫面，觸控裝置一律至少 16px */
+@media (pointer: coarse) {
+  input,
+  textarea,
+  select {
+    font-size: max(16px, 1em);
+  }
 }
 
 button {
