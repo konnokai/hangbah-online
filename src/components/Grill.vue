@@ -80,8 +80,15 @@ let tapTimer: ReturnType<typeof setTimeout> | null = null
 let tapId: string | null = null
 
 function onItemDown(item: GrillItem, e: PointerEvent) {
-  if (e.button !== 0) return
   if (item.heldBy && item.heldBy !== state.you.pid) return
+  // 用滑鼠時右鍵直接刷醬，不用切工具；觸控沒有右鍵，照舊用食材盤的「刷醬」工具
+  if (e.button === 2 && e.pointerType === 'mouse') {
+    e.preventDefault()
+    sfx.unlock()
+    send({ t: 'sauce', id: item.id })
+    return
+  }
+  if (e.button !== 0) return
   e.preventDefault()
   sfx.unlock()
   press = { id: item.id, pointerId: e.pointerId, sx: e.clientX, sy: e.clientY, grabbed: false, lastSent: 0 }
@@ -386,6 +393,7 @@ const emoteSpots = computed(() =>
     :style="{ aspectRatio: TABLE_ASPECT }"
     :class="{ brush: tool === 'brush' }"
     @pointermove="onTableMove"
+    @contextmenu.prevent
   >
     <div class="grill" :style="grillStyle" aria-hidden="true">
       <svg class="bed" viewBox="0 0 100 62.5" preserveAspectRatio="none">

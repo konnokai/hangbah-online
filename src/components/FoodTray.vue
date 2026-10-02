@@ -1,13 +1,13 @@
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
-import { ChevronDown, Plus } from '@lucide/vue'
+import { ChevronDown, Plus, X } from '@lucide/vue'
 import { BUILTIN_FOODS, customFoodId, customFoodUrl, type CustomFood } from '@shared/game'
 import { FOOD_ART } from '@/foods'
 import type { Tool } from './Grill.vue'
 
 const props = defineProps<{ code: string; customFoods: CustomFood[] }>()
 const tool = defineModel<Tool>('tool', { required: true })
-const emit = defineEmits<{ press: [foodId: string, e: PointerEvent]; upload: [] }>()
+const emit = defineEmits<{ press: [foodId: string, e: PointerEvent]; upload: []; close: [] }>()
 
 const customs = computed(() =>
   props.customFoods.map((c) => ({ id: customFoodId(c.id), name: c.name, url: customFoodUrl(props.code, c) })),
@@ -66,12 +66,10 @@ watch(
           🖌️ 刷醬
         </button>
       </div>
+      <button type="button" class="btn btn-sm close" aria-label="收起食材盤" title="收起食材盤" @click="emit('close')">
+        <X :size="18" />
+      </button>
     </div>
-    <p class="hint">
-      把食材<strong>拖到烤架上</strong>就開始烤（點一下隨機放上去，按住不動可以看大圖）。
-      <template v-if="tool === 'tongs'">夾子：拖曳移動、點一下翻面、點兩下吃掉。</template>
-      <template v-else>刷醬：點一下食材刷上烤肉醬，烤得剛好再吃分數更高。</template>
-    </p>
     <div class="grid-wrap" :class="{ more }">
       <div ref="grid" class="grid" @scroll.passive="check">
         <button
@@ -126,8 +124,20 @@ watch(
 }
 
 h2 {
+  flex: 1;
   margin: 0;
   font-size: 1rem;
+}
+
+.close {
+  width: 30px;
+  min-height: 30px;
+  padding: 0;
+  color: var(--muted);
+}
+
+.close:hover {
+  color: var(--text);
 }
 
 .tools {
@@ -141,15 +151,11 @@ h2 {
   color: var(--gold);
 }
 
-.hint {
-  margin: 8px 0 12px;
-  color: var(--muted);
-  font-size: 0.85rem;
-  line-height: 1.5;
-}
-
-.hint strong {
-  color: var(--text);
+/* 有滑鼠就用右鍵刷醬，不需要切工具；觸控裝置沒有右鍵，保留夾子、刷醬兩顆按鈕。玩法說明在進房時的 HowToPlayDialog */
+@media (hover: hover) and (pointer: fine) {
+  .tools {
+    display: none;
+  }
 }
 
 /* 外層決定高度時（電腦版），食材格在裡面捲動；沒限制高度時（手機版）就全部攤開 */
@@ -159,6 +165,7 @@ h2 {
   flex-direction: column;
   flex: 1;
   min-height: 0;
+  margin-top: 12px;
 }
 
 .grid {

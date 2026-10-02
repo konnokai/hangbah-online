@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, effectScope, nextTick, onBeforeUnmount, onMounted, reactive, ref, shallowRef, watch } from 'vue'
 import { RouterLink, onBeforeRouteLeave, useRoute, useRouter } from 'vue-router'
-import { Link, MessageCircle } from '@lucide/vue'
+import { ArrowDown, ArrowDownRight, Drumstick, Link, MessageCircle } from '@lucide/vue'
 import { BUILTIN_FOODS, FOOD_DIFFICULTIES, PERFECT_MIN, customFoodUrl, resolveFood } from '@shared/game'
 import { ROOM_CODE_RE } from '@shared/limits'
 import { useRoom, type Room } from '@/composables/useRoom'
@@ -18,6 +18,7 @@ import NicknameDialog from '@/components/NicknameDialog.vue'
 import UploadFoodDialog from '@/components/UploadFoodDialog.vue'
 import ConfirmDialog from '@/components/ConfirmDialog.vue'
 import Danmaku from '@/components/Danmaku.vue'
+import HowToPlayDialog from '@/components/HowToPlayDialog.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -70,6 +71,58 @@ async function closeChat() {
   await nextTick()
   // 左下角圓鈕是 position: fixed，offsetParent 永遠是 null，只能看有沒有畫出框
   const target = [chatFab.value, chatBtn.value].find((b) => b && b.getClientRects().length > 0)
+  target?.focus()
+}
+
+// ---------- 食材盤收合 ----------
+// 平常收起來，烤架才能佔滿畫面。拖食材、上傳食材都不會收起來，只有點到食材盤外面才收。
+const foodOpen = ref(false)
+const foodDock = ref<HTMLDivElement | null>(null)
+const foodFab = ref<HTMLButtonElement | null>(null)
+const foodBtnBelow = ref<HTMLButtonElement | null>(null)
+// 食材盤平常收起來，新玩家看到空烤架不知道從哪拿東西，要指給他看
+const grillEmpty = computed(() => !!room.value && Object.keys(room.value.state.items).length === 0)
+
+function onOutsidePointer(e: PointerEvent) {
+  // 上傳對話框是從食材盤打開的，在裡面操作不算點到外面
+  if (!foodOpen.value || showUpload.value) return
+  const t = e.target as Element | null
+  if (!t || foodDock.value?.contains(t)) return
+  // 開關按鈕自己會切換，這裡不能先收起來，不然會變成收起又馬上打開
+  if (t.closest('[aria-controls="food-dock"], [role="dialog"], dialog')) return
+  foodOpen.value = false
+}
+// 用 capture：烤架的 pointerdown 會 preventDefault，但不會擋掉這裡
+onMounted(() => document.addEventListener('pointerdown', onOutsidePointer, true))
+onBeforeUnmount(() => document.removeEventListener('pointerdown', onOutsidePointer, true))
+
+// 盤子跟聊天室一樣固定在畫面上、底邊離視窗 16px，上緣對齊烤架那區的頂端。
+// 上面可能多一條斷線提示，頁面也可能捲動，所以打開時量一次，開著時跟著捲動和縮放重量
+const layoutEl = ref<HTMLDivElement | null>(null)
+const dockTop = ref(16)
+function measureDock() {
+  const top = layoutEl.value?.getBoundingClientRect().top ?? 16
+  dockTop.value = Math.max(16, Math.round(top))
+}
+watch(foodOpen, (open) => {
+  if (open) {
+    measureDock()
+    window.addEventListener('scroll', measureDock, { passive: true })
+    window.addEventListener('resize', measureDock)
+  } else {
+    window.removeEventListener('scroll', measureDock)
+    window.removeEventListener('resize', measureDock)
+  }
+})
+onBeforeUnmount(() => {
+  window.removeEventListener('scroll', measureDock)
+  window.removeEventListener('resize', measureDock)
+})
+
+async function closeFood() {
+  foodOpen.value = false
+  await nextTick()
+  const target = [foodFab.value, foodBtnBelow.value].find((b) => b && b.getClientRects().length > 0)
   target?.focus()
 }
 
@@ -128,7 +181,11 @@ function join(name: string) {
   })
   room.value = r
   phase.value = 'room'
+  // 每次進房都說明一次玩法：食材盤平常收著，不講的話新玩家不知道從哪開始
+  howTo.value?.open()
 }
+
+const howTo = ref<InstanceType<typeof HowToPlayDialog> | null>(null)
 
 onBeforeUnmount(() => scope.stop())
 
@@ -226,8 +283,15 @@ function onTrayUp(e: PointerEvent) {
   const { foodId, moved, peeking } = trayDrag
   endTray()
   if (peeking || !grill.value) return
+  // 食材盤蓋在烤架上，放回盤子上面代表不要了，不能放到盤子底下看不到的烤架
+  if (moved && isOverFoodDock(e.clientX, e.clientY)) return
   if (moved) grill.value.spawnAt(foodId, e.clientX, e.clientY)
   else grill.value.spawnRandom(foodId)
+}
+
+function isOverFoodDock(x: number, y: number) {
+  const r = foodDock.value?.getBoundingClientRect()
+  return !!r && r.width > 0 && x >= r.left && x <= r.right && y >= r.top && y <= r.bottom
 }
 
 const onTrayCancel = () => endTray()
@@ -314,13 +378,27 @@ const ghostWidth = computed(() => {
         這個烤肉場已經收攤了。<RouterLink to="/">開新烤肉場</RouterLink>
       </div>
 
-      <div class="layout">
+      <div ref="layoutEl" class="layout">
         <div class="stage">
           <div class="board">
             <Grill ref="grill" :room="room" :code="code" :tool="tool" :muted-pids="muted.pids.value" />
             <PlayerList :players="room.state.players" :you="room.state.you.pid" />
             <Danmaku ref="danmaku" :enabled="danmakuOn" />
+            <p v-if="grillEmpty && !foodOpen" class="empty-hint">
+              <span class="hint-fab">烤架還空著，點右下角的 <Drumstick :size="16" class="hint-icon" /> 拿食材來烤<ArrowDownRight :size="18" class="hint-arrow" /></span>
+              <span class="hint-below">烤架還空著，點下面的「拿食材」<ArrowDown :size="18" class="hint-arrow" /></span>
+            </p>
           </div>
+          <button
+            ref="foodBtnBelow"
+            type="button"
+            class="btn food-toggle-below"
+            :aria-expanded="foodOpen"
+            aria-controls="food-dock"
+            @click="foodOpen = !foodOpen"
+          >
+            <Drumstick :size="18" />拿食材
+          </button>
           <p class="legend" aria-hidden="true">
             <span><i class="dot raw" />生</span>
             <span><i class="dot perfect" />剛好</span>
@@ -328,16 +406,27 @@ const ghostWidth = computed(() => {
             <span class="muted">食材下方的小圓點：左邊是朝上那面，右邊是朝下那面。烤架中間火最大。</span>
           </p>
         </div>
-        <aside class="side">
-          <FoodTray
-            v-model:tool="tool"
-            class="tray-panel"
-            :code="code"
-            :custom-foods="room.state.customFoods"
-            @press="onTrayPress"
-            @upload="showUpload = true"
-          />
-        </aside>
+        <!-- 不是對話框：打開時烤架照樣能操作，食材要拖到烤架上 -->
+        <Transition name="food-pop">
+          <div
+            v-show="foodOpen"
+            id="food-dock"
+            ref="foodDock"
+            class="food-dock"
+            :style="{ '--dock-top': `${dockTop}px` }"
+            @keydown.esc="closeFood"
+          >
+            <FoodTray
+              v-model:tool="tool"
+              class="tray-panel"
+              :code="code"
+              :custom-foods="room.state.customFoods"
+              @press="onTrayPress"
+              @upload="showUpload = true"
+              @close="closeFood"
+            />
+          </div>
+        </Transition>
       </div>
 
       <button
@@ -353,6 +442,20 @@ const ghostWidth = computed(() => {
       >
         <MessageCircle :size="24" />
         <span v-if="unread" class="unread" aria-hidden="true">{{ unreadLabel }}</span>
+      </button>
+
+      <button
+        v-show="!foodOpen"
+        ref="foodFab"
+        type="button"
+        class="food-fab"
+        aria-label="開啟食材盤"
+        :aria-expanded="foodOpen"
+        aria-controls="food-dock"
+        title="食材盤"
+        @click="foodOpen = true"
+      >
+        <Drumstick :size="24" />
       </button>
 
       <!-- 用 v-show 不用 v-if：收起來再打開時，打到一半的字和捲動位置都還在 -->
@@ -398,6 +501,8 @@ const ghostWidth = computed(() => {
       </div>
     </div>
 
+    <HowToPlayDialog ref="howTo" />
+
     <ConfirmDialog
       ref="leaveDialog"
       title="要離開烤肉場嗎？"
@@ -415,7 +520,6 @@ const ghostWidth = computed(() => {
 <style scoped>
 .room-page {
   width: 100%;
-  max-width: 1440px;
   margin: 0 auto;
   padding: 12px 16px 0;
 }
@@ -541,9 +645,16 @@ code {
 }
 
 .layout {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) 340px;
-  gap: 16px;
+  position: relative;
+}
+
+/*
+ * 烤架盡量佔滿畫面：寬度不超過「視窗高度扣掉標題列、說明列」再乘上 16:10 的比例，
+ * 這樣不用捲動就看得到整個烤架。太矮的視窗至少留 320px，不然食材小到點不到。
+ */
+.stage {
+  width: min(100%, max(320px, calc((100dvh - 140px) * 1.6)));
+  margin: 0 auto;
 }
 
 /* 排行榜和彈幕疊在烤架上，所以烤架外面要多包一層定位用的容器 */
@@ -552,24 +663,83 @@ code {
 }
 
 /*
- * 電腦版右欄只剩食材盤，高度跟左邊烤架那欄一樣，食材多了就在盤子裡捲動。
- * contain: size 讓右欄不撐高這一列，列高只由烤架決定，再用 stretch 拉到同高。
- * 排行榜在烤架左上角，聊天室收在畫面左下角。
+ * 食材盤平常收起來，打開時從右下角彈出來蓋在烤架上。上緣對齊烤架那區，底邊跟聊天室一樣離視窗 16px，
+ * 食材多了就在盤子裡捲動。排行榜在烤架左上角，聊天室收在畫面左下角，彼此不重疊。
  */
-.side {
+.food-dock {
+  position: fixed;
+  top: var(--dock-top, 16px);
+  right: 16px;
+  bottom: 16px;
+  z-index: 140;
   display: flex;
-  flex-direction: column;
-  gap: 12px;
-  min-height: 420px;
-  contain: size;
+  width: min(340px, 45vw);
 }
 
 .tray-panel {
   flex: 1;
+  min-width: 0;
+  box-shadow: var(--shadow-lg);
+}
+
+/* 指向右下角的食材按鈕，不擋烤架操作 */
+.empty-hint {
+  position: absolute;
+  right: 14px;
+  bottom: 14px;
+  z-index: 1;
+  margin: 0;
+  padding: 8px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: rgb(0 0 0 / 0.6);
+  color: var(--text);
+  font-size: 0.9rem;
+  pointer-events: none;
+}
+
+.empty-hint > span {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.hint-icon {
+  color: var(--gold);
+}
+
+.hint-arrow {
+  margin-left: 2px;
+  color: var(--gold);
+}
+
+.hint-below {
+  display: none !important;
+}
+
+.food-toggle-below {
+  display: none;
+  gap: 8px;
+  width: 100%;
+  margin-top: 10px;
+}
+
+/* 跟聊天室一樣從按鈕的位置彈出來，聊天室在左下、食材盤在右下 */
+.food-pop-enter-active,
+.food-pop-leave-active {
+  transform-origin: right bottom;
+  transition: opacity 0.15s ease-out, transform 0.15s ease-out;
+}
+
+.food-pop-enter-from,
+.food-pop-leave-to {
+  opacity: 0;
+  transform: translateY(8px) scale(0.97);
 }
 
 /* 聊天室浮在畫面上，不佔版面，打開時會蓋住烤架左下角 */
-.chat-fab {
+.chat-fab,
+.food-fab {
   position: fixed;
   left: 16px;
   bottom: 16px;
@@ -586,8 +756,16 @@ code {
   transition: border-color 0.15s, color 0.15s;
 }
 
-.chat-fab:hover {
+.chat-fab:hover,
+.food-fab:hover {
   border-color: var(--accent);
+  color: var(--gold);
+}
+
+/* 跟聊天室的圓鈕左右對稱，打開時被食材盤蓋住的位置，所以打開就藏起來 */
+.food-fab {
+  right: 16px;
+  left: auto;
   color: var(--gold);
 }
 
@@ -782,17 +960,6 @@ code {
 }
 
 @media (max-width: 960px) {
-  .layout {
-    grid-template-columns: 1fr;
-  }
-
-  .side {
-    display: grid;
-    grid-template-columns: 1fr;
-    min-height: 0;
-    contain: none;
-  }
-
   /* 手機、平板：按鈕移到標題列，聊天室打開時蓋滿整個畫面 */
   .chat-fab {
     display: none;
@@ -813,6 +980,52 @@ code {
   .chat-pop-enter-from,
   .chat-pop-leave-to {
     transform: none;
+  }
+}
+
+/* 直的手機、平板：右邊放不下，改成從下面升上來，上半部的烤架還看得到、能拖過去 */
+@media (max-width: 960px) and (orientation: portrait) {
+  /* 盤子從下面升上來，按鈕放在烤架正下方，不放右下角 */
+  .food-fab {
+    display: none;
+  }
+
+  .food-toggle-below {
+    display: flex;
+  }
+
+  .empty-hint {
+    right: 50%;
+    bottom: 10px;
+    transform: translateX(50%);
+    white-space: nowrap;
+  }
+
+  .hint-fab {
+    display: none !important;
+  }
+
+  .hint-below {
+    display: inline-flex !important;
+  }
+
+  .food-dock {
+    top: auto;
+    right: 0;
+    bottom: 0;
+    left: 0;
+    width: auto;
+    max-height: 55dvh;
+  }
+
+  .tray-panel {
+    border-bottom: 0;
+    border-radius: var(--radius) var(--radius) 0 0;
+  }
+
+  .food-pop-enter-from,
+  .food-pop-leave-to {
+    transform: translateY(24px);
   }
 }
 
