@@ -105,7 +105,7 @@ const foodNames = BUILTIN_FOODS.map((f) => f.name).join('、')
         <p>放著不管會焦，再久就直接燒成灰。朋友也可能先把你的肉夾走。</p>
       </div>
     </section>
-    <p class="foods">今日食材：{{ foodNames }}，還可以上傳自己的圖片做成食材。</p>
+    <p class="foods">食材有{{ foodNames }}，也可以上傳自己的圖片做成食材。</p>
   </main>
 </template>
 

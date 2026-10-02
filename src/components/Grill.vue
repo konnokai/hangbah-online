@@ -15,6 +15,7 @@ import {
   type GrillItem,
 } from '@shared/game'
 import type { Room } from '@/composables/useRoom'
+import { localRect, toLocal } from '@/composables/useRotated'
 import { sfx } from '@/audio/sfx'
 import FoodItem from './FoodItem.vue'
 
@@ -38,12 +39,14 @@ function loop(t: number) {
 }
 
 // ---------- 座標 ----------
+// 直拿的手機整個畫面轉了 90 度，螢幕座標要先換成版面座標（useRotated.ts）
 function toTable(clientX: number, clientY: number) {
-  const r = tableEl.value!.getBoundingClientRect()
+  const r = localRect(tableEl.value!)
+  const { x, y } = toLocal(clientX, clientY)
   return {
-    x: Math.min(1, Math.max(0, (clientX - r.left) / r.width)),
-    y: Math.min(1, Math.max(0, (clientY - r.top) / r.height)),
-    inside: clientX >= r.left && clientX <= r.right && clientY >= r.top && clientY <= r.bottom,
+    x: Math.min(1, Math.max(0, (x - r.left) / r.width)),
+    y: Math.min(1, Math.max(0, (y - r.top) / r.height)),
+    inside: x >= r.left && x <= r.right && y >= r.top && y <= r.bottom,
   }
 }
 
@@ -566,7 +569,7 @@ const emoteSpots = computed(() =>
   position: absolute;
   transform: translate(-50%, -50%);
   font-weight: 800;
-  font-size: clamp(13px, 1.6vw, 18px);
+  font-size: clamp(13px, calc(var(--vw) * 0.016), 18px);
   color: var(--gold);
   text-shadow: 0 2px 4px rgb(0 0 0 / 0.8);
   white-space: nowrap;
@@ -613,7 +616,7 @@ const emoteSpots = computed(() =>
 
 .emote {
   position: absolute;
-  font-size: clamp(24px, 3.4vw, 40px);
+  font-size: clamp(24px, calc(var(--vw) * 0.034), 40px);
   transform: translate(-50%, -50%);
   pointer-events: none;
   animation: emote 2.2s ease-out forwards;

@@ -198,7 +198,7 @@ li.offline {
 }
 
 /* 手機烤架小，排行榜縮小一點，少擋一點烤架 */
-@media (max-width: 960px) {
+@container app (max-width: 960px) {
   .overlay {
     top: 6px;
     left: 6px;

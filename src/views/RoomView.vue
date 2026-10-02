@@ -1,11 +1,12 @@
 <script setup lang="ts">
 import { computed, effectScope, nextTick, onBeforeUnmount, onMounted, reactive, ref, shallowRef, watch } from 'vue'
 import { RouterLink, onBeforeRouteLeave, useRoute, useRouter } from 'vue-router'
-import { ArrowDown, ArrowDownRight, Drumstick, Link, MessageCircle } from '@lucide/vue'
+import { ArrowDownRight, Drumstick, Link, MessageCircle } from '@lucide/vue'
 import { BUILTIN_FOODS, FOOD_DIFFICULTIES, PERFECT_MIN, customFoodUrl, resolveFood } from '@shared/game'
 import { ROOM_CODE_RE } from '@shared/limits'
 import { useRoom, type Room } from '@/composables/useRoom'
 import { useMutedPlayers } from '@/composables/useMutedPlayers'
+import { localRect, toLocal, useRotated } from '@/composables/useRotated'
 import { loadJSON, loadName, saveJSON, saveName } from '@/utils/storage'
 import { sfx } from '@/audio/sfx'
 import { FOOD_ART } from '@/foods'
@@ -33,6 +34,9 @@ const grill = ref<InstanceType<typeof Grill> | null>(null)
 const tool = ref<Tool>('tongs')
 const showUpload = ref(false)
 
+// 直拿的手機進房後整個畫面轉橫；輸入暱稱要打字，先不轉
+useRotated(computed(() => phase.value === 'room'))
+
 const title = computed(() => (host.value ? `${host.value}的烤肉場` : '烤肉場'))
 
 const latency = computed(() => room.value?.state.latency ?? null)
@@ -50,12 +54,11 @@ watch(danmakuOn, (on) => saveJSON(DANMAKU_KEY, { on }))
 const visibleChat = computed(() => room.value?.state.chat.filter((l) => !muted.isMuted(l.pid)) ?? [])
 
 // ---------- 聊天室收合 ----------
-// 電腦版收成左下角的圓鈕，手機版收成標題列的按鈕。平常收起來，彈幕照樣會飄。
+// 收成左下角的圓鈕。平常收起來，彈幕照樣會飄。
 const chatOpen = ref(false)
 const unread = ref(0)
 const chatBox = ref<InstanceType<typeof ChatBox> | null>(null)
 const chatFab = ref<HTMLButtonElement | null>(null)
-const chatBtn = ref<HTMLButtonElement | null>(null)
 const unreadLabel = computed(() => (unread.value > 99 ? '99+' : String(unread.value)))
 
 watch(chatOpen, async (open) => {
@@ -67,11 +70,9 @@ watch(chatOpen, async (open) => {
 
 async function closeChat() {
   chatOpen.value = false
-  // 焦點還給看得到的那顆按鈕，鍵盤使用者才不會迷路
+  // 焦點還給圓鈕，鍵盤使用者才不會迷路
   await nextTick()
-  // 左下角圓鈕是 position: fixed，offsetParent 永遠是 null，只能看有沒有畫出框
-  const target = [chatFab.value, chatBtn.value].find((b) => b && b.getClientRects().length > 0)
-  target?.focus()
+  chatFab.value?.focus()
 }
 
 // ---------- 食材盤收合 ----------
@@ -79,7 +80,6 @@ async function closeChat() {
 const foodOpen = ref(false)
 const foodDock = ref<HTMLDivElement | null>(null)
 const foodFab = ref<HTMLButtonElement | null>(null)
-const foodBtnBelow = ref<HTMLButtonElement | null>(null)
 // 食材盤平常收起來，新玩家看到空烤架不知道從哪拿東西，要指給他看
 const grillEmpty = computed(() => !!room.value && Object.keys(room.value.state.items).length === 0)
 
@@ -101,7 +101,7 @@ onBeforeUnmount(() => document.removeEventListener('pointerdown', onOutsidePoint
 const layoutEl = ref<HTMLDivElement | null>(null)
 const dockTop = ref(16)
 function measureDock() {
-  const top = layoutEl.value?.getBoundingClientRect().top ?? 16
+  const top = layoutEl.value ? localRect(layoutEl.value).top : 16
   dockTop.value = Math.max(16, Math.round(top))
 }
 watch(foodOpen, (open) => {
@@ -122,8 +122,7 @@ onBeforeUnmount(() => {
 async function closeFood() {
   foodOpen.value = false
   await nextTick()
-  const target = [foodFab.value, foodBtnBelow.value].find((b) => b && b.getClientRects().length > 0)
-  target?.focus()
+  foodFab.value?.focus()
 }
 
 // ---------- 提示訊息 ----------
@@ -248,7 +247,7 @@ let peekTimer: ReturnType<typeof setTimeout> | undefined
 
 function onTrayPress(foodId: string, e: PointerEvent) {
   sfx.unlock()
-  Object.assign(trayDrag, { active: true, foodId, x: e.clientX, y: e.clientY, sx: e.clientX, sy: e.clientY, moved: false, peeking: false, pointerId: e.pointerId })
+  Object.assign(trayDrag, { active: true, foodId, ...toLocal(e.clientX, e.clientY), sx: e.clientX, sy: e.clientY, moved: false, peeking: false, pointerId: e.pointerId })
   clearTimeout(peekTimer)
   peekTimer = setTimeout(() => {
     if (trayDrag.active && !trayDrag.moved) trayDrag.peeking = true
@@ -260,8 +259,8 @@ function onTrayPress(foodId: string, e: PointerEvent) {
 
 function onTrayMove(e: PointerEvent) {
   if (e.pointerId !== trayDrag.pointerId) return
-  trayDrag.x = e.clientX
-  trayDrag.y = e.clientY
+  // 拖曳中的食材圖在 #app 裡面定位，畫面轉過時要換成版面座標
+  Object.assign(trayDrag, toLocal(e.clientX, e.clientY))
   if (!trayDrag.moved && Math.hypot(e.clientX - trayDrag.sx, e.clientY - trayDrag.sy) > 6) {
     trayDrag.moved = true
     trayDrag.peeking = false
@@ -354,19 +353,6 @@ const ghostWidth = computed(() => {
           </div>
         </div>
         <div class="actions">
-          <button
-            ref="chatBtn"
-            type="button"
-            class="btn btn-sm chat-btn"
-            :aria-label="unread ? `開啟聊天室，${unread} 則未讀` : '開啟聊天室'"
-            :aria-expanded="chatOpen"
-            aria-controls="chat-dock"
-            title="聊天室"
-            @click="chatOpen = !chatOpen"
-          >
-            <MessageCircle :size="18" />
-            <span v-if="unread" class="unread" aria-hidden="true">{{ unreadLabel }}</span>
-          </button>
           <SoundControl />
           <button class="btn btn-sm btn-primary" @click="share"><Link :size="16" />邀請朋友</button>
         </div>
@@ -385,20 +371,9 @@ const ghostWidth = computed(() => {
             <PlayerList :players="room.state.players" :you="room.state.you.pid" />
             <Danmaku ref="danmaku" :enabled="danmakuOn" />
             <p v-if="grillEmpty && !foodOpen" class="empty-hint">
-              <span class="hint-fab">烤架還空著，點右下角的 <Drumstick :size="16" class="hint-icon" /> 拿食材來烤<ArrowDownRight :size="18" class="hint-arrow" /></span>
-              <span class="hint-below">烤架還空著，點下面的「拿食材」<ArrowDown :size="18" class="hint-arrow" /></span>
+              <span>烤架還空著，點右下角的 <Drumstick :size="16" class="hint-icon" /> 拿食材來烤<ArrowDownRight :size="18" class="hint-arrow" /></span>
             </p>
           </div>
-          <button
-            ref="foodBtnBelow"
-            type="button"
-            class="btn food-toggle-below"
-            :aria-expanded="foodOpen"
-            aria-controls="food-dock"
-            @click="foodOpen = !foodOpen"
-          >
-            <Drumstick :size="18" />拿食材
-          </button>
           <p class="legend" aria-hidden="true">
             <span><i class="dot raw" />生</span>
             <span><i class="dot perfect" />剛好</span>
@@ -527,13 +502,13 @@ const ghostWidth = computed(() => {
 .center {
   display: grid;
   place-items: center;
-  min-height: 60vh;
+  min-height: calc(var(--vh) * 0.6);
   text-align: center;
 }
 
 .gone {
   max-width: 460px;
-  margin: 10vh auto 0;
+  margin: calc(var(--vh) * 0.1) auto 0;
   padding: 32px 24px;
   min-height: 0;
   gap: 10px;
@@ -653,8 +628,33 @@ code {
  * 這樣不用捲動就看得到整個烤架。太矮的視窗至少留 320px，不然食材小到點不到。
  */
 .stage {
-  width: min(100%, max(320px, calc((100dvh - 140px) * 1.6)));
+  width: min(100%, max(320px, calc((var(--vh) - 140px) * 1.6)));
   margin: 0 auto;
+}
+
+/*
+ * 畫面轉橫時整頁不能捲動（main.css），標題列、說明列、頁尾都壓扁，烤架用剩下的高度。
+ * 124px 是這些東西加起來的高度，改了它們的大小要跟著改。手機太矮時寧可烤架小一點，不設最小寬度
+ */
+html.rotated .room-page {
+  padding-top: 8px;
+}
+
+html.rotated .bar {
+  margin-bottom: 8px;
+}
+
+html.rotated .stage {
+  width: min(100%, calc((var(--vh) - 124px) * 1.6));
+}
+
+html.rotated .legend {
+  margin-top: 6px;
+}
+
+/* 說明那句會換成兩行，玩法說明裡也講過了 */
+html.rotated .legend .muted {
+  display: none;
 }
 
 /* 排行榜和彈幕疊在烤架上，所以烤架外面要多包一層定位用的容器 */
@@ -673,7 +673,7 @@ code {
   bottom: 16px;
   z-index: 140;
   display: flex;
-  width: min(340px, 45vw);
+  width: min(340px, calc(var(--vw) * 0.45));
 }
 
 .tray-panel {
@@ -711,17 +711,6 @@ code {
 .hint-arrow {
   margin-left: 2px;
   color: var(--gold);
-}
-
-.hint-below {
-  display: none !important;
-}
-
-.food-toggle-below {
-  display: none;
-  gap: 8px;
-  width: 100%;
-  margin-top: 10px;
 }
 
 /* 跟聊天室一樣從按鈕的位置彈出來，聊天室在左下、食材盤在右下 */
@@ -769,13 +758,6 @@ code {
   color: var(--gold);
 }
 
-.chat-btn {
-  position: relative;
-  display: none;
-  width: 36px;
-  padding: 0;
-}
-
 .unread {
   position: absolute;
   top: -5px;
@@ -799,7 +781,7 @@ code {
   z-index: 150;
   display: flex;
   width: 340px;
-  height: min(480px, calc(100dvh - 32px));
+  height: min(480px, calc(var(--vh) - 32px));
 }
 
 .chat-panel {
@@ -896,7 +878,7 @@ code {
 .peek-art {
   display: grid;
   place-items: center;
-  width: min(300px, 70vw);
+  width: min(300px, calc(var(--vw) * 0.7));
   aspect-ratio: 1;
 }
 
@@ -908,7 +890,7 @@ code {
 }
 
 .peek-name {
-  max-width: min(300px, 70vw);
+  max-width: min(300px, calc(var(--vw) * 0.7));
   margin: 0;
   font-weight: 700;
   text-align: center;
@@ -916,7 +898,7 @@ code {
 }
 
 .peek-stats {
-  max-width: min(300px, 70vw);
+  max-width: min(300px, calc(var(--vw) * 0.7));
   margin: -6px 0 0;
   color: var(--muted);
   font-size: 0.8rem;
@@ -959,77 +941,7 @@ code {
   }
 }
 
-@media (max-width: 960px) {
-  /* 手機、平板：按鈕移到標題列，聊天室打開時蓋滿整個畫面 */
-  .chat-fab {
-    display: none;
-  }
-
-  .chat-btn {
-    display: inline-flex;
-  }
-
-  .chat-dock {
-    inset: 0;
-    width: auto;
-    height: auto;
-    padding: 10px;
-    background: rgb(0 0 0 / 0.55);
-  }
-
-  .chat-pop-enter-from,
-  .chat-pop-leave-to {
-    transform: none;
-  }
-}
-
-/* 直的手機、平板：右邊放不下，改成從下面升上來，上半部的烤架還看得到、能拖過去 */
-@media (max-width: 960px) and (orientation: portrait) {
-  /* 盤子從下面升上來，按鈕放在烤架正下方，不放右下角 */
-  .food-fab {
-    display: none;
-  }
-
-  .food-toggle-below {
-    display: flex;
-  }
-
-  .empty-hint {
-    right: 50%;
-    bottom: 10px;
-    transform: translateX(50%);
-    white-space: nowrap;
-  }
-
-  .hint-fab {
-    display: none !important;
-  }
-
-  .hint-below {
-    display: inline-flex !important;
-  }
-
-  .food-dock {
-    top: auto;
-    right: 0;
-    bottom: 0;
-    left: 0;
-    width: auto;
-    max-height: 55dvh;
-  }
-
-  .tray-panel {
-    border-bottom: 0;
-    border-radius: var(--radius) var(--radius) 0 0;
-  }
-
-  .food-pop-enter-from,
-  .food-pop-leave-to {
-    transform: translateY(24px);
-  }
-}
-
-@media (max-width: 520px) {
+@container app (max-width: 520px) {
   .room-page {
     padding: 8px 10px 0;
   }

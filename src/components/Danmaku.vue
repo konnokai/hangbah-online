@@ -39,7 +39,8 @@ const reducedMotion = typeof matchMedia === 'function' ? matchMedia('(prefers-re
 
 function layout() {
   if (!el.value) return
-  const r = el.value.getBoundingClientRect()
+  // 不用 getBoundingClientRect()：畫面轉 90 度時它量到的是轉過以後的框，寬高會對調
+  const r = { width: el.value.offsetWidth, height: el.value.offsetHeight }
   size.w = r.width
   size.h = r.height
   size.font = Math.round(Math.min(26, Math.max(14, r.width * 0.026)))

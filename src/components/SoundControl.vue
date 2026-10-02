@@ -51,7 +51,7 @@ function toggle() {
   accent-color: var(--accent);
 }
 
-@media (max-width: 520px) {
+@container app (max-width: 520px) {
   .volume {
     display: none;
   }

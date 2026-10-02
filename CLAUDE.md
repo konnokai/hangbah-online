@@ -76,20 +76,27 @@ client 端（`Grill.vue`）算到燒毀門檻就先播動畫，並把 id 放進 
   - 食材盤的夾子 / 刷醬按鈕只在觸控裝置顯示：`FoodTray` 用 `(hover: hover) and (pointer: fine)` 判斷有滑鼠就藏起來。
 - 玩法說明：每次進房（`join()`）都會打開 `HowToPlayDialog`（`<dialog>` + `showModal()`）。食材盤裡不放說明文字。
   - 勾「不再顯示」再關掉（按鈕、Esc、點外面都算），會存 `localStorage` 的 `hangbah:howto`，之後不再跳。要重看就刪掉這個 key。
-  - 說明裡的按鈕位置、刷醬方式用 CSS media query 切換文字，條件要跟 `RoomView`、`FoodTray` 一致，改版面時要一起改。
+  - 說明裡的刷醬方式用 CSS media query 切換文字，條件要跟 `FoodTray` 一致。
 - `src/foods/*.vue`：內建食材是手寫 SVG，顏色用 `cookColor(palette, d)` 依熟度內插。`FOOD_ASPECT` 必須跟各元件的 viewBox 一致；顯示寬度在 `BUILTIN_FOODS.width`。
 - `src/audio/sfx.ts`：Web Audio 即時合成，沒有音檔。`AudioContext` 要在使用者操作時 `sfx.unlock()`。
 - 烤架外面包了 `.board`，上面疊兩層，基本上是 `pointer-events: none`，盡量不擋到拖曳：
-  - 排行榜：`PlayerList`，電腦版、手機版都疊在烤架左上角，手機版縮小。名單可以捲動，所以名單那塊會吃滑鼠事件（標題列不會）。自己那列用 `position: sticky` 貼在上下緣。
+  - 排行榜：`PlayerList`，電腦版、手機版都疊在烤架左上角，手機版縮小。窄的時候（`@container app` ≤ 960px）縮小。名單可以捲動，所以名單那塊會吃滑鼠事件（標題列不會）。自己那列用 `position: sticky` 貼在上下緣。
   - 聊天彈幕：`Danmaku.vue`，RoomView 收到 `chat` 事件時呼叫 `push()`。每則固定飄 7 秒，軌道用字寬和時間計算。
-- 聊天室（`ChatBox`）平常收起來，只剩按鈕，未讀數顯示在按鈕上。電腦版按鈕在畫面左下角，打開後浮在烤架上；手機版（≤ 960px）按鈕在標題列音效按鈕左邊，打開後蓋滿畫面。用 `v-show`，收起來時打到一半的字還在。
+- 聊天室（`ChatBox`）平常收起來，只剩按鈕，未讀數顯示在按鈕上。按鈕在畫面左下角，打開後浮在烤架上。用 `v-show`，收起來時打到一半的字還在。
 - 烤架盡量佔滿畫面：`.stage` 的寬度用視窗高度乘 16:10 算，不用捲動就看得到整個烤架。
+- 直拿的手機不另外做直版：進房後（`phase === 'room'`）整個 `#app` 順時針轉 90 度，照電腦版排（`src/composables/useRotated.ts`，樣式在 `main.css` 的 `html.rotated`）。
+  - 條件是 `(orientation: portrait) and (pointer: coarse) and (max-width: 600px)`。手機本來就橫著、或直拿的平板，都不轉。
+  - 焦點在文字輸入框時先轉回直的，離開輸入框再轉回來，因為鍵盤從手機真正的下面跳出來（雀魂也這樣）。
+  - 轉了以後 media query 和 `vw`/`dvh` 還是照真正的螢幕算。版面跟寬度有關的規則用 `@container app`（`#app` 是 container），尺寸用 `var(--vw)`/`var(--vh)`（轉的時候會對調）。
+  - 螢幕座標要換算：`toLocal(clientX, clientY)`、`localRect(el)`。烤架的 `toTable()`、拖曳中的食材圖、`measureDock()` 都用它。量元素大小用 `offsetWidth`，不要用 `getBoundingClientRect()`（轉了以後寬高對調）。
+  - `showModal()` 的對話框在 top layer，不跟著 `#app` 轉，`main.css` 另外轉它們、自己置中。
+  - 轉過的區塊用手指滑，捲動方向不一定跟著轉（Firefox bug 933129），所以轉的時候整頁不捲動：標題列、說明列、頁尾壓扁，烤架寬度扣 124px 算。玩法說明、上傳食材對話框也改成橫排，不用捲就看得完。改了這些東西的大小要重量。
 - 食材盤平常收起來（`RoomView` 的 `foodOpen`），右下角的圓鈕（`.food-fab`，跟左下角聊天室圓鈕對稱）打開，從右下角彈出來蓋在烤架上（`.food-dock`，`position: fixed`）。底邊跟聊天室一樣離視窗 16px；上緣對齊烤架那區，打開時用 `measureDock()` 量，開著時跟著捲動、縮放重量。不是對話框，打開時烤架照樣能操作。
   - 烤架上沒有食材、盤子又收著時，烤架右下角顯示提示（`.empty-hint`），指向食材按鈕。
   - 拖食材、點食材、上傳對話框裡的操作都不會收起來；只有在食材盤外面 `pointerdown` 才收（`onOutsidePointer`，document capture）。Esc 和盤子右上角的 X 也能收。
   - 食材拖回盤子上面放開不會放上烤架（`isOverFoodDock`），因為盤子底下的烤架看不到。
   - 食材太多時在盤子裡捲動，捲軸隱藏，改用往下箭頭提示。
-  - 直的手機（≤ 960px 且 portrait）：按鈕改成烤架下方的「拿食材」（右下角圓鈕藏起來，提示改指向下面），盤子從下面升上來，最高 55dvh。食材按鈕是 `touch-action: none`（要拖曳），在上面滑不能捲動，只能靠往下箭頭。手機版之後要改成鎖橫向顯示，目前只是暫時能用。
+  - 食材按鈕是 `touch-action: none`（要拖曳），在上面滑不能捲動，觸控裝置只能靠往下箭頭。
 - 食材盤按住不動 450ms 會放大預覽（`RoomView` 的 `trayDrag.peeking`），放開不會放上烤架；預覽中拖動就照常拖曳。
 - 隱藏玩家：`useMutedPlayers`，存在 `localStorage` 的 `hangbah:muted:<房號>`，只在本機生效。會過濾聊天、彈幕、表情，不影響食材和游標。
 - 翻面動畫在 `FoodItem.vue`：`side` 一變就播。先凍結舊的兩面熟度，轉到側面（一半時間）才換色。

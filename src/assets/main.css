@@ -21,6 +21,14 @@
   --shadow-md: 0 6px 16px rgb(0 0 0 / 0.4);
   --shadow-lg: 0 18px 40px -8px rgb(0 0 0 / 0.6);
   --font: "Noto Sans TC", "PingFang TC", "Microsoft JhengHei", system-ui, -apple-system, "Segoe UI", sans-serif;
+  /* 畫面轉 90 度時寬高對調，vw、dvh 還是照真正的螢幕算，所以版面一律用這兩個 */
+  --vw: 100vw;
+  --vh: 100dvh;
+}
+
+html.rotated {
+  --vw: 100dvh;
+  --vh: 100vw;
 }
 
 *,
@@ -57,10 +65,47 @@ body {
   text-rendering: optimizeLegibility;
 }
 
+/* media query 看的是真正的螢幕寬度，轉過以後就不準了，版面跟寬度有關的規則改用 @container app */
 #app {
-  min-height: 100vh;
+  container: app / inline-size;
+  min-height: var(--vh);
   display: flex;
   flex-direction: column;
+}
+
+/*
+ * 直拿的手機：#app 順時針轉 90 度蓋滿螢幕，裡面照電腦版排（useRotated.ts）。
+ * 轉過的區塊用手指滑，捲動方向不一定跟著轉，所以整頁不捲動，房間頁要剛好塞得下。
+ */
+html.rotated,
+html.rotated body {
+  overflow: hidden;
+}
+
+html.rotated #app {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: var(--vw);
+  height: var(--vh);
+  overflow: hidden;
+  transform-origin: top left;
+  transform: translateX(100vw) rotate(90deg);
+}
+
+/*
+ * showModal() 的對話框在 top layer，不會跟著 #app 轉，要自己轉。
+ * 瀏覽器預設的最大寬高、置中是照真正的螢幕算的，轉了以後不對，改成自己置中。
+ * 用 :where() 讓各對話框自己設的寬高蓋得過這裡
+ */
+:where(html.rotated dialog[open]) {
+  top: 50%;
+  left: 50%;
+  max-width: none;
+  max-height: none;
+  margin: 0;
+  translate: -50% -50%;
+  rotate: 90deg;
 }
 
 a {

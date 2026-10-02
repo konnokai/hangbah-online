@@ -57,7 +57,7 @@ defineExpose({ ask })
 
 <style scoped>
 .confirm {
-  width: min(380px, calc(100vw - 32px));
+  width: min(380px, calc(var(--vw) - 32px));
   padding: 0;
   border: 1px solid var(--border);
   border-radius: var(--radius);

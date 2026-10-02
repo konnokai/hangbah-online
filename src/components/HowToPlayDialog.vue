@@ -37,7 +37,7 @@ defineExpose({ open })
         <li>
           <b>拿食材</b>
           <!-- 中文換行會變成空白，句子要寫在同一行 -->
-          <p>點<span class="on-fab">右下角的食材按鈕</span><span class="on-below">烤架下面的「拿食材」</span>打開食材盤，把食材拖到烤架上，或點一下隨機放上去。按住不動可以看大圖和要烤幾秒。</p>
+          <p>點右下角的食材按鈕打開食材盤，把食材拖到烤架上，或點一下隨機放上去。按住不動可以看大圖和要烤幾秒。</p>
         </li>
         <li>
           <b>翻面</b>
@@ -60,9 +60,9 @@ defineExpose({ open })
       <h3>其他</h3>
       <ul class="notes">
         <li>拖曳可以移動食材。別人正在夾的食材拿不到。</li>
-        <li>聊天室在<span class="on-wide">左下角</span><span class="on-narrow">標題列</span>，新訊息會變成彈幕從烤架上飄過。</li>
+        <li>聊天室在左下角，新訊息會變成彈幕從烤架上飄過。</li>
         <li>食材盤最後一格可以上傳圖片，做成大家都能烤的自訂食材。</li>
-        <li>按「邀請朋友」複製連結，朋友打開就能一起烤。</li>
+        <li>按「邀請朋友」把連結傳給朋友，朋友打開就能一起烤。</li>
       </ul>
 
       <div class="actions">
@@ -78,8 +78,8 @@ defineExpose({ open })
 
 <style scoped>
 .howto {
-  width: min(460px, calc(100vw - 32px));
-  max-height: calc(100dvh - 32px);
+  width: min(460px, calc(var(--vw) - 32px));
+  max-height: calc(var(--vh) - 32px);
   padding: 0;
   border: 1px solid var(--border);
   border-radius: var(--radius);
@@ -214,34 +214,48 @@ strong {
   accent-color: var(--accent);
 }
 
-/*
- * 按鈕位置和操作方式跟著裝置變，條件要跟 RoomView、FoodTray 一致：
- * 直的手機食材按鈕在烤架下面；≤ 960px 聊天室按鈕在標題列；有滑鼠才用右鍵刷醬
- */
-.on-below,
-.on-narrow,
+/* 畫面轉橫時很矮，轉過的區塊用手指捲動方向不一定對，所以改成橫向排、字小一點，不用捲就看得完 */
+html.rotated .howto {
+  width: min(780px, calc(var(--vw) - 24px));
+  max-height: calc(var(--vh) - 16px);
+}
+
+html.rotated .panel {
+  padding: 12px 18px;
+}
+
+html.rotated h2 {
+  margin-bottom: 6px;
+  font-size: 1.05rem;
+}
+
+html.rotated h3 {
+  margin: 10px 0 2px;
+}
+
+html.rotated .steps {
+  grid-template-columns: 1fr 1fr;
+  gap: 6px 20px;
+}
+
+html.rotated p,
+html.rotated .notes {
+  font-size: 0.8rem;
+  line-height: 1.5;
+}
+
+html.rotated .notes {
+  columns: 2;
+  column-gap: 32px;
+}
+
+html.rotated .actions {
+  margin-top: 8px;
+}
+
+/* 刷醬的方式跟著裝置變，條件要跟 FoodTray 一致：有滑鼠才用右鍵 */
 .on-mouse {
   display: none;
-}
-
-@media (max-width: 960px) and (orientation: portrait) {
-  .on-fab {
-    display: none;
-  }
-
-  .on-below {
-    display: inline;
-  }
-}
-
-@media (max-width: 960px) {
-  .on-wide {
-    display: none;
-  }
-
-  .on-narrow {
-    display: inline;
-  }
 }
 
 @media (hover: hover) and (pointer: fine) {

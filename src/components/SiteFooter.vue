@@ -57,6 +57,11 @@ function onBackdrop(e: MouseEvent) {
   font-size: 0.85rem;
 }
 
+/* 畫面轉橫時整頁不能捲動，頁尾要壓扁才塞得下烤架 */
+html.rotated .footer {
+  padding: 2px 16px 6px;
+}
+
 .footer a,
 .link {
   padding: 0;
@@ -74,8 +79,8 @@ function onBackdrop(e: MouseEvent) {
 }
 
 .about-dialog {
-  width: min(720px, calc(100vw - 32px));
-  max-height: min(85vh, 900px);
+  width: min(720px, calc(var(--vw) - 32px));
+  max-height: min(calc(var(--vh) * 0.85), 900px);
   padding: 0;
   border: 1px solid var(--border);
   border-radius: var(--radius);
@@ -93,7 +98,7 @@ function onBackdrop(e: MouseEvent) {
 .panel {
   display: flex;
   flex-direction: column;
-  max-height: min(85vh, 900px);
+  max-height: min(calc(var(--vh) * 0.85), 900px);
 }
 
 .head {

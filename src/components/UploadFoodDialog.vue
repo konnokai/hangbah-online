@@ -78,8 +78,8 @@ onBeforeUnmount(() => preview.value && URL.revokeObjectURL(preview.value))
     <form class="dialog card" role="dialog" aria-modal="true" aria-labelledby="upload-title" @submit.prevent="submit">
       <h2 id="upload-title">新增自訂食材</h2>
       <p class="muted">
-        上傳一張圖，房間裡的人都能拿來烤。圖片會縮到 {{ LIMITS.clientResizeDim }}px，限 PNG / JPEG / WebP。
-        請只上傳你有權使用的圖片。
+        <!-- 中文換行會變成空白，句子要寫在同一行 -->
+        上傳一張圖，房間裡的人都能拿來烤。圖片會縮到 {{ LIMITS.clientResizeDim }}px，限 PNG / JPEG / WebP。請只上傳你有權使用的圖片。
       </p>
       <label class="file">
         <input type="file" accept="image/png,image/jpeg,image/webp" @change="onFile" />
@@ -256,5 +256,55 @@ h2 {
   justify-content: flex-end;
   gap: 8px;
   margin-top: 16px;
+}
+
+/* 畫面轉橫時很矮，轉過的區塊用手指捲動方向不一定對，改成左邊圖片、右邊欄位，不用捲就塞得下 */
+html.rotated .backdrop {
+  padding: 8px;
+}
+
+html.rotated .dialog {
+  display: grid;
+  grid-template-columns: 180px 1fr;
+  column-gap: 18px;
+  width: min(640px, 100%);
+  padding: 14px 18px;
+}
+
+html.rotated h2,
+html.rotated .muted {
+  grid-column: 1 / -1;
+}
+
+html.rotated h2 {
+  margin-bottom: 2px;
+}
+
+html.rotated .muted {
+  margin-bottom: 8px;
+  font-size: 0.8rem;
+}
+
+html.rotated .level {
+  padding: 4px;
+}
+
+html.rotated .error {
+  margin-top: 6px;
+  font-size: 0.8rem;
+}
+
+html.rotated .file {
+  grid-row: 3 / span 4;
+  height: auto;
+  margin-bottom: 0;
+}
+
+html.rotated .field + .field {
+  margin-top: 8px;
+}
+
+html.rotated .actions {
+  margin-top: 10px;
 }
 </style>
